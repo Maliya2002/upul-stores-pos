@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface ExportButtonProps<T extends Record<string, unknown>> {
+interface ExportButtonProps<T extends object> {
   data: T[];
   filename?: string;
 }
@@ -23,21 +23,26 @@ function downloadBlob(content: string, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function toCSV<T extends Record<string, unknown>>(rows: T[]) {
+function toCSV<T extends object>(rows: T[]) {
   if (!rows.length) return "";
-  const headers = Object.keys(rows[0]);
+
+  const headers = Object.keys(rows[0]) as Array<keyof T>;
+
   const csv = [
     headers.join(","),
     ...rows.map((row) =>
       headers
-        .map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`)
+        .map((header) =>
+          `"${String(row[header] ?? "").replace(/"/g, '""')}"`
+        )
         .join(",")
     ),
   ].join("\n");
+
   return csv;
 }
 
-export function ExportButton<T extends Record<string, unknown>>({
+export function ExportButton<T extends object>({
   data,
   filename = "export",
 }: ExportButtonProps<T>) {

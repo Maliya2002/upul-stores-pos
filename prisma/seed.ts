@@ -1,19 +1,18 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
-const prisma = new PrismaClient();
+const prismaSeed = new PrismaClient();
 
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  // ── Users ──────────────────────────────────────────────────
-  const adminExists = await prisma.user.findUnique({
+  const adminExists = await prismaSeed.user.findUnique({
     where: { email: "admin@upulstores.lk" },
   });
 
   if (!adminExists) {
     const hashed = await bcrypt.hash("Admin@123", 12);
-    await prisma.user.create({
+    await prismaSeed.user.create({
       data: {
         name: "Upul Admin",
         email: "admin@upulstores.lk",
@@ -25,10 +24,9 @@ async function main() {
     });
     console.log("✅ Admin user created");
   } else {
-    console.log("⏭️  Admin user already exists");
+    console.log("⏭️ Admin user already exists");
   }
 
-  // ── Categories ─────────────────────────────────────────────
   const categories = [
     { name: "Beverages", slug: "beverages", description: "Drinks and beverages" },
     { name: "Dairy", slug: "dairy", description: "Milk and dairy products" },
@@ -41,7 +39,7 @@ async function main() {
   ];
 
   for (const cat of categories) {
-    await prisma.category.upsert({
+    await prismaSeed.category.upsert({
       where: { slug: cat.slug },
       update: {},
       create: { ...cat, isActive: true },
@@ -49,7 +47,6 @@ async function main() {
   }
   console.log("✅ Categories seeded");
 
-  // ── Brands ─────────────────────────────────────────────────
   const brands = [
     { name: "Milo", slug: "milo" },
     { name: "Anchor", slug: "anchor" },
@@ -62,7 +59,7 @@ async function main() {
   ];
 
   for (const brand of brands) {
-    await prisma.brand.upsert({
+    await prismaSeed.brand.upsert({
       where: { slug: brand.slug },
       update: {},
       create: { ...brand, isActive: true },
@@ -70,7 +67,6 @@ async function main() {
   }
   console.log("✅ Brands seeded");
 
-  // ── Suppliers ──────────────────────────────────────────────
   const suppliers = [
     {
       name: "ABC Distributors",
@@ -96,16 +92,18 @@ async function main() {
   ];
 
   for (const supplier of suppliers) {
-    const existing = await prisma.supplier.findFirst({
+    const existing = await prismaSeed.supplier.findFirst({
       where: { phone: supplier.phone },
     });
+
     if (!existing) {
-      await prisma.supplier.create({ data: { ...supplier, isActive: true } });
+      await prismaSeed.supplier.create({
+        data: { ...supplier, isActive: true },
+      });
     }
   }
   console.log("✅ Suppliers seeded");
 
-  // ── Customers ──────────────────────────────────────────────
   const customers = [
     {
       name: "Kamal Perera",
@@ -144,18 +142,18 @@ async function main() {
   ];
 
   for (const customer of customers) {
-    const existing = await prisma.customer.findFirst({
+    const existing = await prismaSeed.customer.findFirst({
       where: { phone: customer.phone },
     });
+
     if (!existing) {
-      await prisma.customer.create({
+      await prismaSeed.customer.create({
         data: { ...customer, isActive: true },
       });
     }
   }
   console.log("✅ Customers seeded");
 
-  // ── Settings ───────────────────────────────────────────────
   const settings = [
     { key: "store_name", value: "Upul Stores", description: "Store name" },
     { key: "store_phone", value: "+94771234567", description: "Store phone" },
@@ -170,7 +168,7 @@ async function main() {
   ];
 
   for (const setting of settings) {
-    await prisma.settings.upsert({
+    await prismaSeed.settings.upsert({
       where: { key: setting.key },
       update: { value: setting.value },
       create: setting,
@@ -178,7 +176,6 @@ async function main() {
   }
   console.log("✅ Settings seeded");
 
-  // ── Notifications ──────────────────────────────────────────
   const notifications = [
     {
       title: "Low Stock Alert",
@@ -198,34 +195,33 @@ async function main() {
   ];
 
   for (const notif of notifications) {
-    await prisma.notification.create({ data: notif });
+    await prismaSeed.notification.create({ data: notif });
   }
   console.log("✅ Notifications seeded");
 
-  // ── Products ───────────────────────────────────────────────
-  const beveragesCat = await prisma.category.findUnique({
+  const beveragesCat = await prismaSeed.category.findUnique({
     where: { slug: "beverages" },
   });
-  const dairyCat = await prisma.category.findUnique({
+  const dairyCat = await prismaSeed.category.findUnique({
     where: { slug: "dairy" },
   });
-  const groceriesCat = await prisma.category.findUnique({
+  const groceriesCat = await prismaSeed.category.findUnique({
     where: { slug: "groceries" },
   });
-  const healthCat = await prisma.category.findUnique({
+  const healthCat = await prismaSeed.category.findUnique({
     where: { slug: "health" },
   });
-  const householdCat = await prisma.category.findUnique({
+  const householdCat = await prismaSeed.category.findUnique({
     where: { slug: "household" },
   });
 
-  const miloBrand = await prisma.brand.findUnique({ where: { slug: "milo" } });
-  const anchorBrand = await prisma.brand.findUnique({ where: { slug: "anchor" } });
-  const dettolBrand = await prisma.brand.findUnique({ where: { slug: "dettol" } });
-  const sunlightBrand = await prisma.brand.findUnique({ where: { slug: "sunlight" } });
-  const ceylonTeaBrand = await prisma.brand.findUnique({ where: { slug: "ceylon-tea" } });
+  const miloBrand = await prismaSeed.brand.findUnique({ where: { slug: "milo" } });
+  const anchorBrand = await prismaSeed.brand.findUnique({ where: { slug: "anchor" } });
+  const dettolBrand = await prismaSeed.brand.findUnique({ where: { slug: "dettol" } });
+  const sunlightBrand = await prismaSeed.brand.findUnique({ where: { slug: "sunlight" } });
+  const ceylonTeaBrand = await prismaSeed.brand.findUnique({ where: { slug: "ceylon-tea" } });
 
-  const supplier = await prisma.supplier.findFirst();
+  const supplier = await prismaSeed.supplier.findFirst();
 
   const products = [
     {
@@ -348,19 +344,19 @@ async function main() {
   ];
 
   for (const product of products) {
-    const existing = await prisma.product.findUnique({
+    const existing = await prismaSeed.product.findUnique({
       where: { sku: product.sku },
     });
+
     if (!existing && product.categoryId) {
-      await prisma.product.create({ data: product });
+      await prismaSeed.product.create({ data: product });
     }
   }
   console.log("✅ Products seeded");
 
-  // ── Warehouse ──────────────────────────────────────────────
-  const warehouseExists = await prisma.warehouse.findFirst();
+  const warehouseExists = await prismaSeed.warehouse.findFirst();
   if (!warehouseExists) {
-    await prisma.warehouse.create({
+    await prismaSeed.warehouse.create({
       data: {
         name: "Main Warehouse",
         location: "Colombo",
@@ -370,12 +366,12 @@ async function main() {
   }
   console.log("✅ Warehouse seeded");
 
-  // ── Coupon ─────────────────────────────────────────────────
-  const couponExists = await prisma.coupon.findUnique({
+  const couponExists = await prismaSeed.coupon.findUnique({
     where: { code: "WELCOME10" },
   });
+
   if (!couponExists) {
-    await prisma.coupon.create({
+    await prismaSeed.coupon.create({
       data: {
         code: "WELCOME10",
         description: "Welcome discount 10%",
@@ -403,5 +399,7 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await prismaSeed.$disconnect();
   });
+
+export {};
