@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, Bell, Maximize2, Minimize2 } from "lucide-react";
@@ -12,13 +11,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { cn, getGreeting } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -50,9 +49,10 @@ const notifications = [
   },
 ];
 
-export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
+export function Navbar({ onMenuClick }: NavbarProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { logout, user } = useAuth();
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -70,7 +70,6 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
       transition={{ duration: 0.3 }}
       className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/95 backdrop-blur px-4"
     >
-      {/* Mobile Menu */}
       <Button
         variant="ghost"
         size="icon"
@@ -80,7 +79,6 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Greeting */}
       <div className="hidden sm:flex flex-col">
         <p className="text-sm font-semibold leading-tight">
           {getGreeting()},{" "}
@@ -94,11 +92,9 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
         </p>
       </div>
 
-      {/* Right Actions */}
       <div className="ml-auto flex items-center gap-1.5">
         <SearchCommand />
 
-        {/* Fullscreen */}
         <Button
           variant="ghost"
           size="icon"
@@ -128,7 +124,6 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
           </AnimatePresence>
         </Button>
 
-        {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div className="relative inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent transition-colors cursor-pointer">
@@ -140,39 +135,45 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
               />
             </div>
           </DropdownMenuTrigger>
-       <DropdownMenuContent align="end" className="w-56">
-  <DropdownMenuLabel>
-    <div className="flex flex-col gap-0.5">
-      <p className="font-semibold">{user?.name ?? "Upul Admin"}</p>
-      <p className="text-xs text-muted-foreground font-normal">
-        {user?.email ?? "admin@upulstores.lk"}
-      </p>
-      <Badge variant="secondary" className="w-fit text-[10px] mt-1">
-        {user?.role ?? "Owner"}
-      </Badge>
-    </div>
-  </DropdownMenuLabel>
-  <DropdownMenuSeparator />
-  <DropdownMenuItem className="cursor-pointer">
-    Profile Settings
-  </DropdownMenuItem>
-  <DropdownMenuItem className="cursor-pointer">
-    Store Settings
-  </DropdownMenuItem>
-  <DropdownMenuSeparator />
-  <DropdownMenuItem
-    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-    onClick={logout}
-  >
-    Logout
-  </DropdownMenuItem>
-</DropdownMenuContent>
+          <DropdownMenuContent align="end" className="w-80">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="font-semibold text-sm">Notifications</span>
+              <Badge variant="secondary" className="text-xs font-medium">
+                {notifications.length} new
+              </Badge>
+            </div>
+            <Separator />
+            {notifications.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="flex flex-col items-start gap-0.5 py-3 px-4 cursor-pointer"
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-full shrink-0",
+                      n.type === "warning" && "bg-amber-500",
+                      n.type === "success" && "bg-emerald-500",
+                      n.type === "error" && "bg-red-500"
+                    )}
+                  />
+                  <span className="text-sm font-medium">{n.title}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
+                    {n.time}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground pl-4">{n.desc}</p>
+              </DropdownMenuItem>
+            ))}
+            <Separator />
+            <DropdownMenuItem className="justify-center text-primary text-sm font-medium py-2.5 cursor-pointer">
+              View all notifications →
+            </DropdownMenuItem>
+          </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Theme */}
         <ThemeToggle />
 
-        {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div className="flex items-center justify-center h-9 w-9 rounded-full cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
@@ -184,17 +185,17 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
+            <div className="px-4 py-3">
               <div className="flex flex-col gap-0.5">
-                <p className="font-semibold">Upul Admin</p>
+                <p className="font-semibold">{user?.name ?? "Upul Admin"}</p>
                 <p className="text-xs text-muted-foreground font-normal">
-                  admin@upulstores.lk
+                  {user?.email ?? "admin@upulstores.lk"}
                 </p>
                 <Badge variant="secondary" className="w-fit text-[10px] mt-1">
-                  Owner
+                  {user?.role ?? "OWNER"}
                 </Badge>
               </div>
-            </DropdownMenuLabel>
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer">
               Profile Settings
@@ -203,7 +204,10 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
               Store Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+            <DropdownMenuItem
+              className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+              onClick={logout}
+            >
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>

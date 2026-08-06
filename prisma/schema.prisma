@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ────────────────────────────────────────────────────
+
 enum Role {
   OWNER
   ADMIN
@@ -15,21 +17,116 @@ enum Role {
   INVENTORY_STAFF
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  password      String
-  role          Role      @default(CASHIER)
-  avatar        String?
-  phone         String?
-  isActive      Boolean   @default(true)
-  lastLogin     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
 
-  sessions      Session[]
-  accounts      Account[]
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  ON_HOLD
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  QR
+  GIFT_CARD
+  MIXED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  PARTIAL
+  REFUNDED
+}
+
+enum PurchaseStatus {
+  PENDING
+  RECEIVED
+  PARTIAL
+  CANCELLED
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  TRANSFER
+  DAMAGED
+  EXPIRED
+  RETURN
+}
+
+enum ExpenseCategory {
+  SALARY
+  ELECTRICITY
+  TRANSPORT
+  RENT
+  INTERNET
+  MAINTENANCE
+  MARKETING
+  OTHER
+}
+
+enum MembershipLevel {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum NotificationType {
+  LOW_STOCK
+  OUT_OF_STOCK
+  EXPIRY_ALERT
+  PAYMENT_DUE
+  DAILY_REPORT
+  SYSTEM
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── User & Auth ──────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(CASHIER)
+  avatar    String?
+  phone     String?
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sessions    Session[]
+  accounts    Account[]
+  orders      Order[]
+  attendances Attendance[]
+  salaries    Salary[]
+  leaves      Leave[]
+  auditLogs   AuditLog[]
 
   @@map("users")
 }
@@ -92,4 +189,470 @@ model OTPToken {
   createdAt DateTime @default(now())
 
   @@map("otp_tokens")
+}
+
+// ─── Product Management ───────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  image       String?
+  parentId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryParent")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  logo        String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("brands")
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  sku           String        @unique
+  barcode       String?       @unique
+  description   String?
+  categoryId    String
+  brandId       String?
+  supplierId    String?
+  purchasePrice Float         @default(0)
+  sellingPrice  Float         @default(0)
+  tax           Float         @default(0)
+  discount      Float         @default(0)
+  quantity      Int           @default(0)
+  minimumStock  Int           @default(10)
+  unit          String        @default("pcs")
+  weight        Float?
+  color         String?
+  size          String?
+  images        String[]
+  status        ProductStatus @default(ACTIVE)
+  expiryDate    DateTime?
+  batchNumber   String?
+  hasVariants   Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  category       Category         @relation(fields: [categoryId], references: [id])
+  brand          Brand?           @relation(fields: [brandId], references: [id])
+  supplier       Supplier?        @relation(fields: [supplierId], references: [id])
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  purchaseItems  PurchaseItem[]
+  stockMovements StockMovement[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("products")
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  name      String
+  sku       String  @unique
+  barcode   String?
+  price     Float
+  quantity  Int     @default(0)
+  color     String?
+  size      String?
+  image     String?
+  isActive  Boolean @default(true)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+// ─── Supplier ─────────────────────────────────────────────────
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String
+  address     String?
+  company     String?
+  taxNumber   String?
+  balance     Float    @default(0)
+  totalOrders Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products         Product[]
+  purchases        Purchase[]
+  supplierPayments SupplierPayment[]
+
+  @@map("suppliers")
+}
+
+model SupplierPayment {
+  id          String        @id @default(cuid())
+  supplierId  String
+  amount      Float
+  method      PaymentMethod @default(CASH)
+  reference   String?
+  notes       String?
+  paidAt      DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@map("supplier_payments")
+}
+
+// ─── Customer ─────────────────────────────────────────────────
+
+model Customer {
+  id              String          @id @default(cuid())
+  name            String
+  email           String?         @unique
+  phone           String?
+  address         String?
+  avatar          String?
+  loyaltyPoints   Int             @default(0)
+  creditBalance   Float           @default(0)
+  totalPurchases  Float           @default(0)
+  totalOrders     Int             @default(0)
+  membershipLevel MembershipLevel @default(BRONZE)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  orders Order[]
+
+  @@map("customers")
+}
+
+// ─── Orders & POS ─────────────────────────────────────────────
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique
+  customerId    String?
+  cashierId     String
+  subtotal      Float
+  taxAmount     Float         @default(0)
+  discountAmount Float        @default(0)
+  total         Float
+  paidAmount    Float         @default(0)
+  changeAmount  Float         @default(0)
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(PAID)
+  orderStatus   OrderStatus   @default(COMPLETED)
+  notes         String?
+  receiptPrinted Boolean      @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  customer   Customer?    @relation(fields: [customerId], references: [id])
+  cashier    User         @relation(fields: [cashierId], references: [id])
+  items      OrderItem[]
+  payments   OrderPayment[]
+  refunds    Refund[]
+
+  @@index([customerId])
+  @@index([cashierId])
+  @@index([orderStatus])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  productId  String
+  name       String
+  sku        String
+  quantity   Int
+  unitPrice  Float
+  discount   Float   @default(0)
+  tax        Float   @default(0)
+  total      Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderPayment {
+  id        String        @id @default(cuid())
+  orderId   String
+  method    PaymentMethod
+  amount    Float
+  reference String?
+  createdAt DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_payments")
+}
+
+model Refund {
+  id        String   @id @default(cuid())
+  orderId   String
+  amount    Float
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("refunds")
+}
+
+// ─── Inventory ────────────────────────────────────────────────
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  productId   String
+  type        StockMovementType
+  quantity    Int
+  beforeQty   Int
+  afterQty    Int
+  reference   String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+// ─── Purchases ────────────────────────────────────────────────
+
+model Purchase {
+  id             String         @id @default(cuid())
+  purchaseNumber String         @unique
+  supplierId     String
+  subtotal       Float
+  taxAmount      Float          @default(0)
+  discountAmount Float          @default(0)
+  total          Float
+  paidAmount     Float          @default(0)
+  status         PurchaseStatus @default(PENDING)
+  paymentMethod  PaymentMethod  @default(CASH)
+  paymentStatus  PaymentStatus  @default(PENDING)
+  notes          String?
+  purchasedAt    DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  items    PurchaseItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id           String  @id @default(cuid())
+  purchaseId   String
+  productId    String
+  name         String
+  quantity     Int
+  unitCost     Float
+  total        Float
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@map("purchase_items")
+}
+
+// ─── Expenses ─────────────────────────────────────────────────
+
+model Expense {
+  id          String          @id @default(cuid())
+  title       String
+  amount      Float
+  category    ExpenseCategory
+  description String?
+  receipt     String?
+  paidAt      DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([category])
+  @@index([createdAt])
+  @@map("expenses")
+}
+
+// ─── Employees ────────────────────────────────────────────────
+
+model Attendance {
+  id         String           @id @default(cuid())
+  userId     String
+  date       DateTime
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  notes      String?
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("attendances")
+}
+
+model Salary {
+  id          String   @id @default(cuid())
+  userId      String
+  month       Int
+  year        Int
+  basicSalary Float
+  allowances  Float    @default(0)
+  deductions  Float    @default(0)
+  commission  Float    @default(0)
+  netSalary   Float
+  isPaid      Boolean  @default(false)
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("salaries")
+}
+
+model Leave {
+  id         String      @id @default(cuid())
+  userId     String
+  startDate  DateTime
+  endDate    DateTime
+  reason     String
+  status     LeaveStatus @default(PENDING)
+  approvedBy String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("leaves")
+}
+
+// ─── Settings ─────────────────────────────────────────────────
+
+model Settings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ─── Notifications ────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entity     String
+  entityId   String?
+  oldValues  String?  @db.Text
+  newValues  String?  @db.Text
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Coupons ──────────────────────────────────────────────────
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String    @default("percentage")
+  discountValue Float
+  minimumAmount Float?
+  usageLimit    Int?
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("coupons")
 }
