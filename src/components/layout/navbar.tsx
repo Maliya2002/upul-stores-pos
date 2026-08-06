@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, Bell, Maximize2, Minimize2 } from "lucide-react";
@@ -51,7 +52,7 @@ const notifications = [
 
 export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-
+  const { logout, user } = useAuth();
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -139,41 +140,33 @@ export function Navbar({ onMenuClick, sidebarOpen, isMobile }: NavbarProps) {
               />
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between py-3">
-              <span className="font-semibold">Notifications</span>
-              <Badge variant="secondary" className="text-xs font-medium">
-                {notifications.length} new
-              </Badge>
-            </DropdownMenuLabel>
-            <Separator />
-            {notifications.map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                className="flex flex-col items-start gap-0.5 py-3 px-4 cursor-pointer"
-              >
-                <div className="flex items-center gap-2 w-full">
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full shrink-0",
-                      n.type === "warning" && "bg-amber-500",
-                      n.type === "success" && "bg-emerald-500",
-                      n.type === "error" && "bg-red-500"
-                    )}
-                  />
-                  <span className="text-sm font-medium">{n.title}</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
-                    {n.time}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground pl-4">{n.desc}</p>
-              </DropdownMenuItem>
-            ))}
-            <Separator />
-            <DropdownMenuItem className="justify-center text-primary text-sm font-medium py-2.5 cursor-pointer">
-              View all notifications →
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+       <DropdownMenuContent align="end" className="w-56">
+  <DropdownMenuLabel>
+    <div className="flex flex-col gap-0.5">
+      <p className="font-semibold">{user?.name ?? "Upul Admin"}</p>
+      <p className="text-xs text-muted-foreground font-normal">
+        {user?.email ?? "admin@upulstores.lk"}
+      </p>
+      <Badge variant="secondary" className="w-fit text-[10px] mt-1">
+        {user?.role ?? "Owner"}
+      </Badge>
+    </div>
+  </DropdownMenuLabel>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem className="cursor-pointer">
+    Profile Settings
+  </DropdownMenuItem>
+  <DropdownMenuItem className="cursor-pointer">
+    Store Settings
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem
+    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+    onClick={logout}
+  >
+    Logout
+  </DropdownMenuItem>
+</DropdownMenuContent>
         </DropdownMenu>
 
         {/* Theme */}
