@@ -4,6 +4,7 @@ export { ProductVariantForm } from "./product-variant-form";
 export { ProductBarcodeCard } from "./product-barcode-card";
 export { ProductQrCard } from "./product-qr-card";
 export { DeleteProductButton } from "./delete-product-button";
+export { ProductsTable } from "./products-table";
 export {
   getProductTableColumns,
   type ProductTableRow,

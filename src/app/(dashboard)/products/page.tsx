@@ -3,10 +3,9 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, ExportButton, PrintButton } from "@/components/ui-custom";
-import { DataTable } from "@/components/tables";
 import { getProducts } from "@/features/products/actions/product-actions";
 import {
-  getProductTableColumns,
+  ProductsTable,
   type ProductTableRow,
 } from "@/features/products/components";
 import { getStockState } from "@/features/products/utils/product-helpers";
@@ -14,22 +13,22 @@ import { getStockState } from "@/features/products/utils/product-helpers";
 export default async function ProductsPage() {
   const products = await getProducts();
 
-  const rows: ProductTableRow[] = products.map((product: (typeof products)[number]) => ({
-    id: product.id,
-    name: product.name,
-    sku: product.sku,
-    barcode: product.barcode,
-    category: product.category.name,
-    brand: product.brand?.name ?? "-",
-    supplier: product.supplier?.name ?? "-",
-    price: product.sellingPrice,
-    quantity: product.quantity,
-    minimumStock: product.minimumStock,
-    stockStatus: getStockState(product.quantity, product.minimumStock),
-    status: product.status,
-  }));
-
-  const columns = getProductTableColumns();
+  const rows: ProductTableRow[] = products.map(
+    (product: (typeof products)[number]) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode,
+      category: product.category.name,
+      brand: product.brand?.name ?? "-",
+      supplier: product.supplier?.name ?? "-",
+      price: product.sellingPrice,
+      quantity: product.quantity,
+      minimumStock: product.minimumStock,
+      stockStatus: getStockState(product.quantity, product.minimumStock),
+      status: product.status,
+    })
+  );
 
   return (
     <div className="space-y-6">
@@ -53,18 +52,7 @@ export default async function ProductsPage() {
 
       <Card>
         <CardContent className="p-5">
-          <DataTable
-            columns={columns}
-            data={rows}
-            searchKey="name"
-            searchPlaceholder="Search products..."
-            filterColumn="status"
-            filterOptions={[
-              { label: "Active", value: "ACTIVE" },
-              { label: "Inactive", value: "INACTIVE" },
-              { label: "Discontinued", value: "DISCONTINUED" },
-            ]}
-          />
+          <ProductsTable data={rows} />
         </CardContent>
       </Card>
     </div>
