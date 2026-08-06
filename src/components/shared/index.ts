@@ -3,3 +3,7 @@ export { ThemeToggle } from "./theme-toggle";
 export { SearchCommand } from "./search-command";
 export { BreadcrumbNav } from "./breadcrumb-nav";
 export { EmptyState } from "./empty-state";
+export { AnimatedCounter } from "./animated-counter";
+export { GradientCard } from "./gradient-card";
+export { GlassCard } from "./glass-card";
+export { SectionHeader } from "./section-header";
