@@ -15,6 +15,7 @@ import {
   Settings,
   Bell,
   Brain,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 
@@ -50,10 +51,6 @@ export const navigationConfig: NavGroup[] = [
         title: "Products",
         href: "/products",
         icon: Package,
-        children: [
-          { title: "All Products", href: "/products", icon: Package },
-          { title: "Add Product", href: "/products/add", icon: Package },
-        ],
       },
       {
         title: "Categories",
@@ -142,6 +139,12 @@ export const navigationConfig: NavGroup[] = [
         href: "/notifications",
         icon: Bell,
         badge: "3",
+      },
+      {
+        title: "UI Showcase",
+        href: "/ui-showcase",
+        icon: Palette,
+        badge: "UI",
       },
       {
         title: "Settings",
