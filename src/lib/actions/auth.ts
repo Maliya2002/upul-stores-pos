@@ -231,3 +231,43 @@ export async function createDefaultAdmin() {
     return { success: false, error: "Failed to create admin." };
   }
 }
+
+/* ── Register ──────────────────────────── */
+
+export async function registerAction(data: {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}) {
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existing) {
+      return { success: false, error: "Email already registered." };
+    }
+
+    if (data.password.length < 6) {
+      return { success: false, error: "Password must be at least 6 characters." };
+    }
+
+    const hashed = await bcrypt.hash(data.password, 12);
+
+    await prisma.user.create({
+      data: {
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+        password: hashed,
+        phone: data.phone?.trim() || null,
+        role: "CASHIER",
+        isActive: true,
+      },
+    });
+
+    return { success: true, message: "Account created successfully." };
+  } catch {
+    return { success: false, error: "Failed to create account." };
+  }
+}

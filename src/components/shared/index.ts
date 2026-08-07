@@ -7,3 +7,6 @@ export { AnimatedCounter } from "./animated-counter";
 export { GradientCard } from "./gradient-card";
 export { GlassCard } from "./glass-card";
 export { SectionHeader } from "./section-header";
+export { ParticlesBg } from "./particles-bg";
+export { GradientBg } from "./gradient-bg";
+export { LoadingBar } from "./loading-bar";
