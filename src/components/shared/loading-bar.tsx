@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export function LoadingBar() {
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] h-1">
+    <div className="fixed top-0 left-0 right-0 z-100 h-1">
       <motion.div
         initial={{ width: "0%" }}
         animate={{ width: "100%" }}

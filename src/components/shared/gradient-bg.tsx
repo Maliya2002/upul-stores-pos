@@ -55,7 +55,7 @@ export function GradientBg({
           ease: "easeInOut",
         }}
         className={cn(
-          "absolute -top-1/2 -right-1/4 h-[500px] w-[500px] rounded-full blur-3xl",
+          "absolute -top-1/2 -right-1/4 h-125 w-125 rounded-full blur-3xl",
           colors[0]
         )}
       />
@@ -70,7 +70,7 @@ export function GradientBg({
           ease: "easeInOut",
         }}
         className={cn(
-          "absolute -bottom-1/4 -left-1/4 h-[400px] w-[400px] rounded-full blur-3xl",
+          "absolute -bottom-1/4 -left-1/4 h-100 w-100 rounded-full blur-3xl",
           colors[1]
         )}
       />
@@ -85,7 +85,7 @@ export function GradientBg({
           ease: "easeInOut",
         }}
         className={cn(
-          "absolute top-1/2 left-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl",
+          "absolute top-1/2 left-1/2 h-75 w-75 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl",
           colors[2]
         )}
       />

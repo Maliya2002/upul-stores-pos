@@ -112,7 +112,7 @@ export default function LoginPage() {
               <motion.div
                 key={stat.label}
                 whileHover={{ scale: 1.05, y: -3 }}
-                className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 min-w-[120px]"
+                className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 min-w-125"
               >
                 <p className="text-2xl mb-1">{stat.icon}</p>
                 <p className="text-2xl font-black">{stat.value}</p>
@@ -289,7 +289,7 @@ export default function LoginPage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
             >
-              <Card className="border-dashed border-primary/20 bg-primary/[0.02]">
+              <Card className="border-dashed border-primary/20 bg-primary/2">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-center gap-2 mb-3">
                     <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -339,7 +339,7 @@ export default function LoginPage() {
   </Link>
 </motion.p>
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Upul Stores. All rights reserved.
+          © {new Date().getFullYear()} Upul Stores. All rights reserved.
           </p>
         </motion.div>
       </div>

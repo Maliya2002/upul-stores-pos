@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import type { UserRole } from "@/types/auth";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
@@ -29,23 +30,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         try {
           const user = await prisma.user.findUnique({
-            where: {
-              email: credentials.email as string,
-            },
+            where: { email: credentials.email as string },
           });
 
-          if (!user || !user.isActive) {
-            return null;
-          }
+          if (!user || !user.isActive) return null;
 
-          const isPasswordValid = await bcrypt.compare(
+          const isValid = await bcrypt.compare(
             credentials.password as string,
             user.password
           );
 
-          if (!isPasswordValid) {
-            return null;
-          }
+          if (!isValid) return null;
 
           await prisma.user.update({
             where: { id: user.id },
@@ -69,19 +64,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id ?? "";
-        token.role = (user as { role: UserRole }).role;
-        token.isActive = (user as { isActive: boolean }).isActive;
+        const customUser = user as unknown as {
+          id: string;
+          role: UserRole;
+          isActive: boolean;
+        };
+        token.id = customUser.id ?? "";
+        token.role = customUser.role;
+        token.isActive = customUser.isActive;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string;
-        (session.user as unknown as { role: UserRole }).role =
-          token.role as UserRole;
-        (session.user as unknown as { isActive: boolean }).isActive =
-          token.isActive as boolean;
+        const customSession = session.user as unknown as {
+          id: string;
+          role: UserRole;
+          isActive: boolean;
+        };
+        customSession.id = token.id as string;
+        customSession.role = token.role as UserRole;
+        customSession.isActive = token.isActive as boolean;
       }
       return session;
     },
