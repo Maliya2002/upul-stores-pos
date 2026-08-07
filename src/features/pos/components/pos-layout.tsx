@@ -129,7 +129,7 @@ export function POSLayout({
         </div>
 
         {/* Right — Cart */}
-        <div className="w-[380px] xl:w-[420px] shrink-0 hidden md:flex">
+        <div className="w-95 xl:w-105 shrink-0 hidden md:flex">
           <CartPanel
             customers={customers}
             onCheckout={() => setPaymentOpen(true)}

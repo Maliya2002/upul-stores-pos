@@ -10,6 +10,7 @@ import {
   Gift,
   CheckCircle,
   Loader2,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -52,11 +53,12 @@ export function PaymentModal({
   const [method, setMethod] = useState("CASH");
   const [paidAmount, setPaidAmount] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
-  const [orderResult, setOrderResult] = useState<{
-    orderNumber: string;
-    total: number;
-    change: number;
-  } | null>(null);
+ const [orderResult, setOrderResult] = useState<{
+  orderNumber: string;
+  orderId: string;
+  total: number;
+  change: number;
+} | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const items = useCartStore((s) => s.items);
@@ -105,11 +107,12 @@ export function PaymentModal({
       }
 
       setIsSuccess(true);
-      setOrderResult({
-        orderNumber: result.orderNumber ?? "",
-        total: result.total ?? total,
-        change: result.changeAmount ?? 0,
-      });
+    setOrderResult({
+  orderNumber: result.orderNumber ?? "",
+  orderId: result.orderId ?? "",
+  total: result.total ?? total,
+  change: result.changeAmount ?? 0,
+});
 
       clearCart();
     });
@@ -164,19 +167,30 @@ export function PaymentModal({
                   </div>
                 )}
               </div>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleClose}
-                >
-                  New Sale
-                </Button>
-                <Button className="flex-1" onClick={handleClose}>
-                  Done
-                </Button>
-              </div>
+<div className="flex gap-3">
+  <Button
+    variant="outline"
+    className="flex-1"
+    onClick={handleClose}
+  >
+    New Sale
+  </Button>
+  <Button
+    className="flex-1"
+    onClick={() => {
+      if (orderResult?.orderId) {
+        window.open(
+          `/sales/${orderResult.orderId}?print=1`,
+          "_blank"
+        );
+      }
+      handleClose();
+    }}
+  >
+    <Printer className="mr-2 h-4 w-4" />
+    Print & Done
+  </Button>
+</div>
             </motion.div>
           ) : (
             <motion.div key="payment" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

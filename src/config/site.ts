@@ -13,7 +13,7 @@ export const siteConfig = {
   contact: {
     phone: "+94 77 123 4567",
     email: "info@upulstores.lk",
-    address: "No. 123, Main Street, Colombo, Sri Lanka",
+    address: "Boraluketiya Junction, Kamburupitiya, Matara",
   },
 };
 
