@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui-custom";
 import {
   AttendanceCard,
+  AttendanceForm,
   EmployeeStatsCards,
 } from "@/features/employees/components";
 import { getEmployeeById } from "@/features/employees/actions/employee-actions";
@@ -42,6 +43,9 @@ export default async function EmployeeDetailPage({
         status={employee.isActive ? "Active" : "Inactive"}
       />
 
+      {/* Mark Attendance */}
+      <AttendanceForm userId={employee.id} userName={employee.name} />
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardContent className="p-5 grid gap-4 sm:grid-cols-2">
@@ -50,13 +54,20 @@ export default async function EmployeeDetailPage({
             <InfoItem
               label="Last Login"
               value={
-                employee.lastLogin ? formatDateTime(employee.lastLogin) : "Never"
+                employee.lastLogin
+                  ? formatDateTime(employee.lastLogin)
+                  : "Never"
               }
             />
             <InfoItem
               label="Joined"
               value={formatDateTime(employee.createdAt)}
             />
+            <InfoItem
+              label="Status"
+              value={employee.isActive ? "Active" : "Inactive"}
+            />
+            <InfoItem label="Email" value={employee.email} />
           </CardContent>
         </Card>
 

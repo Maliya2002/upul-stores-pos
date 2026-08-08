@@ -1,8 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader, StatusBadge } from "@/components/ui-custom";
+import { PageHeader } from "@/components/ui-custom";
 import { Badge } from "@/components/ui/badge";
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
+import { NotificationActions } from "./notification-actions";
 
 const typeEmoji: Record<string, string> = {
   LOW_STOCK: "📦",
@@ -27,6 +28,7 @@ export default async function NotificationsPage() {
         title="Notifications"
         badge={unreadCount > 0 ? `${unreadCount} unread` : "All read"}
         description="System alerts and notifications."
+        actions={<NotificationActions hasUnread={unreadCount > 0} />}
       />
 
       <Card>
@@ -43,7 +45,7 @@ export default async function NotificationsPage() {
                 (notif: (typeof notifications)[number]) => (
                   <div
                     key={notif.id}
-                    className={`flex items-start gap-4 rounded-xl border p-4 transition-colors ${
+                    className={`flex items-start gap-4 rounded-xl border p-4 transition-all duration-200 ${
                       notif.isRead
                         ? "bg-background"
                         : "bg-primary/5 border-primary/20"
@@ -56,7 +58,7 @@ export default async function NotificationsPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-sm font-bold">{notif.title}</p>
                         {!notif.isRead && (
-                          <span className="h-2 w-2 rounded-full bg-primary" />
+                          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -66,7 +68,10 @@ export default async function NotificationsPage() {
                         {formatDateTime(notif.createdAt)}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] shrink-0"
+                    >
                       {notif.type.replace(/_/g, " ")}
                     </Badge>
                   </div>

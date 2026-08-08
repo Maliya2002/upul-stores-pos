@@ -250,18 +250,21 @@ function SidebarItem({ item, collapsed, onNavigate }: SidebarItemProps) {
   const hasChildren = item.children && item.children.length > 0;
 
   // Check if current path matches this item or any of its children
-  const isActive =
-    pathname === item.href ||
-    (item.href !== "/dashboard" &&
-      item.href !== "/inventory" &&
-      pathname.startsWith(item.href));
+  const isExactMatch = pathname === item.href;
+const isParentMatch =
+  item.href !== "/dashboard" &&
+  item.href.length > 1 &&
+  pathname.startsWith(item.href + "/");
 
-  const isChildActive = hasChildren
-    ? item.children!.some(
-        (child) =>
-          pathname === child.href || pathname.startsWith(child.href + "/")
-      )
-    : false;
+const isActive = isExactMatch || isParentMatch;
+
+ const isChildActive = hasChildren
+  ? item.children!.some(
+      (child) =>
+        pathname === child.href ||
+        (child.href.length > 1 && pathname.startsWith(child.href + "/"))
+    )
+  : false;
 
   const isHighlighted = isActive || isChildActive;
 
