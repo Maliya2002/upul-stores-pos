@@ -14,7 +14,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    console.error("App Error:", error);
   }, [error]);
 
   return (
@@ -30,16 +30,24 @@ export default function Error({
             <AlertTriangle className="h-14 w-14 text-destructive" />
           </div>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <h2 className="text-2xl font-bold mb-2">Something Went Wrong!</h2>
-          <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
-            An unexpected error occurred. Please try again or go back to
-            dashboard.
+          <h2 className="text-2xl font-black mb-2">
+            Something Went Wrong!
+          </h2>
+          <p className="text-muted-foreground text-sm mb-2 leading-relaxed">
+            An unexpected error occurred. Please try again.
           </p>
+          {error.digest && (
+            <p className="text-xs text-muted-foreground/60 mb-6 font-mono">
+              Error ID: {error.digest}
+            </p>
+          )}
+
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={reset}>
               <RefreshCcw className="h-4 w-4 mr-2" />

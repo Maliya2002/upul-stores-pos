@@ -16,6 +16,9 @@ import {
   Bell,
   Brain,
   Palette,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,120 +40,57 @@ export const navigationConfig: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      {
-        title: "Dashboard",
-        href: "/dashboard",
-        icon: LayoutDashboard,
-      },
+      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     ],
   },
   {
     label: "Product Management",
     items: [
-      {
-        title: "Products",
-        href: "/products",
-        icon: Package,
-      },
-      {
-        title: "Categories",
-        href: "/categories",
-        icon: FolderTree,
-      },
-      {
-        title: "Brands",
-        href: "/brands",
-        icon: Tags,
-      },
+      { title: "Products", href: "/products", icon: Package },
+      { title: "Categories", href: "/categories", icon: FolderTree },
+      { title: "Brands", href: "/brands", icon: Tags },
     ],
   },
   {
     label: "People",
     items: [
-      {
-        title: "Suppliers",
-        href: "/suppliers",
-        icon: Truck,
-      },
-      {
-        title: "Customers",
-        href: "/customers",
-        icon: Users,
-      },
-      {
-        title: "Employees",
-        href: "/employees",
-        icon: UserCog,
-      },
+      { title: "Suppliers", href: "/suppliers", icon: Truck },
+      { title: "Customers", href: "/customers", icon: Users },
+      { title: "Employees", href: "/employees", icon: UserCog },
     ],
   },
   {
     label: "Operations",
     items: [
-      {
-        title: "POS",
-        href: "/pos",
-        icon: ShoppingCart,
-        badge: "Live",
-      },
+      { title: "POS", href: "/pos", icon: ShoppingCart, badge: "Live" },
       {
         title: "Inventory",
         href: "/inventory",
         icon: Warehouse,
+        children: [
+          { title: "Overview", href: "/inventory", icon: Warehouse },
+          { title: "Stock In", href: "/inventory/stock-in", icon: ArrowDownToLine },
+          { title: "Stock Out", href: "/inventory/stock-out", icon: ArrowUpFromLine },
+          { title: "Movements", href: "/inventory/movements", icon: History },
+        ],
       },
-      {
-        title: "Sales",
-        href: "/sales",
-        icon: Receipt,
-      },
-      {
-        title: "Purchases",
-        href: "/purchases",
-        icon: ShoppingBag,
-      },
-      {
-        title: "Expenses",
-        href: "/expenses",
-        icon: Wallet,
-      },
+      { title: "Sales", href: "/sales", icon: Receipt },
+      { title: "Purchases", href: "/purchases", icon: ShoppingBag },
+      { title: "Expenses", href: "/expenses", icon: Wallet },
     ],
   },
   {
     label: "Analytics",
     items: [
-      {
-        title: "Reports",
-        href: "/reports",
-        icon: BarChart3,
-      },
-      {
-        title: "AI Insights",
-        href: "/ai-insights",
-        icon: Brain,
-        badge: "New",
-      },
+      { title: "Reports", href: "/reports", icon: BarChart3 },
+      { title: "AI Insights", href: "/ai-insights", icon: Brain, badge: "AI" },
     ],
   },
   {
     label: "System",
     items: [
-      {
-        title: "Notifications",
-        href: "/notifications",
-        icon: Bell,
-        badge: "3",
-      },
-      {
-        title: "UI Showcase",
-        href: "/ui-showcase",
-        icon: Palette,
-        badge: "UI",
-      },
-      {
-        title: "Settings",
-        href: "/settings",
-        icon: Settings,
-      },
+      { title: "Notifications", href: "/notifications", icon: Bell },
+      { title: "Settings", href: "/settings", icon: Settings },
     ],
   },
 ];
