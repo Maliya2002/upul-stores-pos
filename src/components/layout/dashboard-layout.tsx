@@ -35,7 +35,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       />
 
       {/* Main Content */}
-      {/* ✅ Hydration fix: server always renders lg:pl-70 */}
       <div
         className={cn(
           "flex min-h-screen flex-col transition-all duration-300",
@@ -44,22 +43,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             : "lg:pl-70"
         )}
       >
+        {/* Navbar */}
         <Navbar
           onMenuClick={toggle}
           sidebarOpen={isOpen}
           isMobile={isMobile}
         />
 
+        {/* Page Content */}
         <motion.main
           key="main-content"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="flex-1 p-4 md:p-6"
+          className="flex-1 p-4 md:p-6 lg:p-8"
         >
           {children}
         </motion.main>
 
+        {/* Footer */}
         <Footer />
       </div>
     </div>
