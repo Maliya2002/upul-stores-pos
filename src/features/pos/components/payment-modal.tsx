@@ -7,7 +7,6 @@ import {
   CreditCard,
   Building,
   QrCode,
-  Gift,
   CheckCircle,
   Loader2,
   Printer,
@@ -42,7 +41,6 @@ const paymentMethods = [
     color: "bg-purple-500",
   },
   { id: "QR", label: "QR", icon: QrCode, color: "bg-cyan-500" },
-  { id: "GIFT_CARD", label: "Gift", icon: Gift, color: "bg-pink-500" },
 ];
 
 export function PaymentModal({
@@ -53,12 +51,12 @@ export function PaymentModal({
   const [method, setMethod] = useState("CASH");
   const [paidAmount, setPaidAmount] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
- const [orderResult, setOrderResult] = useState<{
-  orderNumber: string;
-  orderId: string;
-  total: number;
-  change: number;
-} | null>(null);
+  const [orderResult, setOrderResult] = useState<{
+    orderNumber: string;
+    orderId: string;
+    total: number;
+    change: number;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const items = useCartStore((s) => s.items);
@@ -82,6 +80,7 @@ export function PaymentModal({
   ].filter((a, i, arr) => a >= total && arr.indexOf(a) === i);
 
   const handlePay = () => {
+    if (isPending || items.length === 0) return;
     if (method === "CASH" && paid < total) {
       toast.error("Insufficient amount.");
       return;
@@ -107,18 +106,19 @@ export function PaymentModal({
       }
 
       setIsSuccess(true);
-    setOrderResult({
-  orderNumber: result.orderNumber ?? "",
-  orderId: result.orderId ?? "",
-  total: result.total ?? total,
-  change: result.changeAmount ?? 0,
-});
+      setOrderResult({
+        orderNumber: result.orderNumber ?? "",
+        orderId: result.orderId ?? "",
+        total: result.total ?? total,
+        change: result.changeAmount ?? 0,
+      });
 
       clearCart();
     });
   };
 
   const handleClose = () => {
+    if (isPending) return;
     setIsSuccess(false);
     setOrderResult(null);
     setPaidAmount("");
@@ -167,33 +167,37 @@ export function PaymentModal({
                   </div>
                 )}
               </div>
-<div className="flex gap-3">
-  <Button
-    variant="outline"
-    className="flex-1"
-    onClick={handleClose}
-  >
-    New Sale
-  </Button>
-  <Button
-    className="flex-1"
-    onClick={() => {
-      if (orderResult?.orderId) {
-        window.open(
-          `/sales/${orderResult.orderId}?print=1`,
-          "_blank"
-        );
-      }
-      handleClose();
-    }}
-  >
-    <Printer className="mr-2 h-4 w-4" />
-    Print & Done
-  </Button>
-</div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleClose}
+                >
+                  New Sale
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    if (orderResult?.orderId) {
+                      window.open(
+                        `/sales/${orderResult.orderId}?print=1`,
+                        "_blank",
+                      );
+                    }
+                    handleClose();
+                  }}
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print & Done
+                </Button>
+              </div>
             </motion.div>
           ) : (
-            <motion.div key="payment" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div
+              key="payment"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
               <DialogHeader className="p-6 pb-4">
                 <DialogTitle className="text-xl font-black">
                   Payment
@@ -216,7 +220,11 @@ export function PaymentModal({
                   <Label className="text-xs font-bold mb-2 block">
                     Payment Method
                   </Label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Confirm that payment was received before recording the sale.
+                    Card, bank and QR payments are recorded manually.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
                     {paymentMethods.map((pm) => (
                       <motion.button
                         key={pm.id}
@@ -290,7 +298,9 @@ export function PaymentModal({
                 <Button
                   onClick={handlePay}
                   disabled={
-                    isPending || (method === "CASH" && paid < total)
+                    isPending ||
+                    items.length === 0 ||
+                    (method === "CASH" && paid < total)
                   }
                   className="w-full h-12 text-base font-bold rounded-xl shadow-lg"
                 >

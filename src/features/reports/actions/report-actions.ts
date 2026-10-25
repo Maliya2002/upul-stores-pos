@@ -1,8 +1,11 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import prisma from "@/lib/prisma";
 
 export async function getDashboardReport() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -115,9 +118,9 @@ export async function getDashboardReport() {
   });
 
   // Calculate low stock
-  const lowStock = (lowStockCount as { quantity: number; minimumStock: number }[]).filter(
-    (p) => p.quantity > 0 && p.quantity <= p.minimumStock
-  ).length;
+  const lowStock = (
+    lowStockCount as { quantity: number; minimumStock: number }[]
+  ).filter((p) => p.quantity > 0 && p.quantity <= p.minimumStock).length;
 
   const monthRevenue = monthSales._sum.total ?? 0;
   const monthExpenseTotal = monthExpenses._sum.amount ?? 0;
@@ -169,13 +172,25 @@ export async function getDashboardReport() {
 }
 
 async function getMonthlySalesData() {
-  const months: { month: string; revenue: number; orders: number; expenses: number }[] = [];
+  const months: {
+    month: string;
+    revenue: number;
+    orders: number;
+    expenses: number;
+  }[] = [];
 
   for (let i = 5; i >= 0; i--) {
     const date = new Date();
     date.setMonth(date.getMonth() - i);
     const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+    const end = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
 
     const [sales, expenses] = await Promise.all([
       prisma.order.aggregate({

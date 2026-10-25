@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { processRefundAction } from "../actions/sales-actions";
+import { useAuth } from "@/hooks/use-auth";
 
 interface RefundButtonProps {
   orderId: string;
@@ -33,6 +34,9 @@ export function RefundButton({
   const [reason, setReason] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { isManager } = useAuth();
+
+  if (!isManager) return null;
 
   const maxRefundable = orderTotal - existingRefunds;
 
@@ -58,7 +62,7 @@ export function RefundButton({
       const result = await processRefundAction(
         orderId,
         refundAmount,
-        reason.trim()
+        reason.trim(),
       );
 
       if (!result.success) {
@@ -103,9 +107,7 @@ export function RefundButton({
             <div className="rounded-xl border p-4 bg-muted/30">
               <div className="flex justify-between text-sm">
                 <span>Order Total</span>
-                <span className="font-bold">
-                  {formatCurrency(orderTotal)}
-                </span>
+                <span className="font-bold">{formatCurrency(orderTotal)}</span>
               </div>
               {existingRefunds > 0 && (
                 <div className="flex justify-between text-sm text-red-500 mt-1">

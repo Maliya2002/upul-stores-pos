@@ -23,10 +23,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  registerSchema,
-  type RegisterFormData,
-} from "@/lib/validations/auth";
+import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 import { registerAction } from "@/lib/actions/auth";
 import { ParticlesBg } from "@/components/shared/particles-bg";
 import { TextReveal } from "@/components/animations/text-reveal";
@@ -67,8 +64,8 @@ export default function RegisterPage() {
         return;
       }
 
-      toast.success("Account created! Please sign in.");
-      router.push("/login");
+      toast.success("Staff account created.");
+      router.push("/employees");
     } catch {
       toast.error("Something went wrong.");
     } finally {
@@ -157,7 +154,7 @@ export default function RegisterPage() {
 
           <div className="mb-8">
             <TextReveal
-              text="Create Account ✨"
+              text="Create Staff Account"
               className="text-3xl font-black"
             />
             <motion.p

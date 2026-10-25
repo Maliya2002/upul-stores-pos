@@ -15,15 +15,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-} from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/use-auth";
+import { canAccessRoute } from "@/lib/route-access";
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -55,6 +52,15 @@ function SidebarInnerContent({
   onToggle,
   onCloseMobile,
 }: SidebarInnerProps) {
+  const { user, logout } = useAuth();
+  const visibleNavigation = navigationConfig
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canAccessRoute(item.href, user?.role),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
@@ -81,16 +87,14 @@ function SidebarInnerContent({
       <ScrollArea className="flex-1 py-4">
         <TooltipProvider>
           <nav className="px-3 space-y-5">
-            {navigationConfig.map((group, groupIndex) => (
+            {visibleNavigation.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {!collapsed && (
                   <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                     {group.label}
                   </p>
                 )}
-                {collapsed && groupIndex > 0 && (
-                  <Separator className="mb-3" />
-                )}
+                {collapsed && groupIndex > 0 && <Separator className="mb-3" />}
                 <div className="space-y-0.5">
                   {group.items.map((item) => (
                     <SidebarItem
@@ -112,26 +116,34 @@ function SidebarInnerContent({
         <div
           className={cn(
             "flex items-center gap-3 rounded-xl p-2.5 hover:bg-muted/60 transition-colors cursor-pointer",
-            collapsed && "justify-center p-2"
+            collapsed && "justify-center p-2",
           )}
         >
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarFallback className="bg-linear-to-br from-blue-500 to-purple-600 text-white text-xs font-bold">
-              UA
+              {user?.name
+                .split(" ")
+                .map((part) => part[0])
+                .slice(0, 2)
+                .join("") || "US"}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">Upul Admin</p>
+                <p className="text-sm font-semibold truncate">
+                  {user?.name ?? "Staff"}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  Owner
+                  {user?.role ?? ""}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={logout}
+                aria-label="Sign out"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </Button>
@@ -156,7 +168,7 @@ export function Sidebar({
   // ✅ Hydration fix: server + client initial state same විය යුතුයි
   // Server: isOpen=true, isMobile=false → collapsed=false
   // Client after hydration: correct values use කරයි
-  const collapsed = isHydrated ? (!isOpen && !isMobile) : false;
+  const collapsed = isHydrated ? !isOpen && !isMobile : false;
 
   return (
     <>
@@ -244,7 +256,7 @@ function SidebarItem({ item, collapsed, onNavigate }: SidebarItemProps) {
         isActive
           ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
           : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-        collapsed && "justify-center px-2 py-2.5"
+        collapsed && "justify-center px-2 py-2.5",
       )}
     >
       <item.icon className="h-4.5 w-4.5 shrink-0" />
@@ -260,7 +272,7 @@ function SidebarItem({ item, collapsed, onNavigate }: SidebarItemProps) {
                 item.badge === "New" &&
                   "bg-blue-500/15 text-blue-600 border-blue-500/20 hover:bg-blue-500/15",
                 !["Live", "New"].includes(item.badge) &&
-                  "bg-red-500/15 text-red-500 border-red-500/20 hover:bg-red-500/15"
+                  "bg-red-500/15 text-red-500 border-red-500/20 hover:bg-red-500/15",
               )}
               variant="outline"
             >
@@ -271,7 +283,7 @@ function SidebarItem({ item, collapsed, onNavigate }: SidebarItemProps) {
             <ChevronDown
               className={cn(
                 "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
-                expanded && "rotate-180"
+                expanded && "rotate-180",
               )}
             />
           )}
@@ -325,7 +337,7 @@ function SidebarItem({ item, collapsed, onNavigate }: SidebarItemProps) {
                       "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
                       pathname === child.href
                         ? "bg-accent text-accent-foreground font-medium"
-                        : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground",
                     )}
                   >
                     <child.icon className="h-3.5 w-3.5 shrink-0" />

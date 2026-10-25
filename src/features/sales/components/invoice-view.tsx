@@ -36,6 +36,7 @@ interface InvoiceViewProps {
   paymentStatus: string;
   orderStatus: string;
   autoPrint?: boolean;
+  receiptSettings?: Record<string, string>;
 }
 
 export function InvoiceView({
@@ -54,7 +55,13 @@ export function InvoiceView({
   paymentStatus,
   orderStatus,
   autoPrint = false,
+  receiptSettings = {},
 }: InvoiceViewProps) {
+  const storeName = receiptSettings.store_name || siteConfig.name;
+  const storeAddress =
+    receiptSettings.store_address || siteConfig.contact.address;
+  const storePhone = receiptSettings.store_phone || siteConfig.contact.phone;
+  const storeEmail = receiptSettings.store_email || siteConfig.contact.email;
   const invoiceRef = useRef<HTMLDivElement>(null);
   const hasPrinted = useRef(false);
 
@@ -72,10 +79,7 @@ export function InvoiceView({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       {/* Print Buttons — Hidden when printing */}
       <div className="flex gap-3 mb-4 print:hidden">
         <Button onClick={handlePrint} className="flex-1">
@@ -85,7 +89,10 @@ export function InvoiceView({
       </div>
 
       {/* Invoice Card */}
-      <Card className="overflow-hidden print:shadow-none print:border-0" ref={invoiceRef}>
+      <Card
+        className="overflow-hidden print:shadow-none print:border-0"
+        ref={invoiceRef}
+      >
         {/* ─── Invoice Header ─── */}
         <div className="bg-linear-to-br from-blue-600 via-indigo-700 to-purple-800 p-8 text-white print:bg-white print:text-black print:p-6 print:border-b-2 print:border-black">
           <div className="flex items-start justify-between">
@@ -94,9 +101,9 @@ export function InvoiceView({
                 <ShoppingBag className="h-7 w-7 text-white print:text-black" />
               </div>
               <div>
-                <h2 className="text-2xl font-black">{siteConfig.name}</h2>
+                <h2 className="text-2xl font-black">{storeName}</h2>
                 <p className="text-blue-100 text-xs print:text-gray-500">
-                  {siteConfig.description}
+                  {receiptSettings.receipt_header || siteConfig.description}
                 </p>
               </div>
             </div>
@@ -109,10 +116,9 @@ export function InvoiceView({
           </div>
 
           <div className="mt-6 text-xs text-blue-100 print:text-gray-500">
-            <p>{siteConfig.contact.address}</p>
+            <p>{storeAddress}</p>
             <p>
-              Tel: {siteConfig.contact.phone} · Email:{" "}
-              {siteConfig.contact.email}
+              Tel: {storePhone} · Email: {storeEmail}
             </p>
           </div>
         </div>
@@ -217,9 +223,7 @@ export function InvoiceView({
             <div className="w-full max-w-xs space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">
-                  {formatCurrency(subtotal)}
-                </span>
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
 
               {taxAmount > 0 && (
@@ -253,9 +257,7 @@ export function InvoiceView({
 
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Paid</span>
-                <span className="font-bold">
-                  {formatCurrency(paidAmount)}
-                </span>
+                <span className="font-bold">{formatCurrency(paidAmount)}</span>
               </div>
 
               {changeAmount > 0 && (
@@ -274,16 +276,16 @@ export function InvoiceView({
 
           <div className="text-center space-y-2">
             <p className="text-sm font-bold">
-              Thank you for shopping at {siteConfig.name}! 🎉
+              {receiptSettings.receipt_footer ||
+                `Thank you for shopping at ${storeName}!`}
             </p>
+            <p className="text-xs text-muted-foreground">{storeAddress}</p>
             <p className="text-xs text-muted-foreground">
-              {siteConfig.contact.address}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Tel: {siteConfig.contact.phone} · {siteConfig.contact.email}
+              Tel: {storePhone} · {storeEmail}
             </p>
             <p className="text-[10px] text-muted-foreground mt-3 print:mt-4">
-              This is a computer generated invoice. No signature required.
+              {receiptSettings.receipt_note ||
+                "This is a computer generated invoice. No signature required."}
             </p>
             <p className="text-[10px] text-muted-foreground">
               Powered by {siteConfig.name} Smart POS v{siteConfig.version}

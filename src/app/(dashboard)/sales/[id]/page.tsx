@@ -3,11 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui-custom";
-import {
-  InvoiceView,
-  RefundButton,
-} from "@/features/sales/components";
+import { InvoiceView, RefundButton } from "@/features/sales/components";
 import { getSaleById } from "@/features/sales/actions/sales-actions";
+import { getReceiptSettings } from "@/features/settings/actions/settings-actions";
 
 export default async function SaleDetailPage({
   params,
@@ -18,14 +16,14 @@ export default async function SaleDetailPage({
 }) {
   const { id } = await params;
   const { print } = await searchParams;
-  const sale = await getSaleById(id);
+  const [sale, receiptSettings] = await Promise.all([
+    getSaleById(id),
+    getReceiptSettings(),
+  ]);
 
   if (!sale) notFound();
 
-  const existingRefunds = sale.refunds.reduce(
-    (sum, r) => sum + r.amount,
-    0
-  );
+  const existingRefunds = sale.refunds.reduce((sum, r) => sum + r.amount, 0);
 
   const shouldAutoPrint = print === "1";
 
@@ -56,21 +54,20 @@ export default async function SaleDetailPage({
 
       <div className="max-w-3xl mx-auto" data-invoice-printable>
         <InvoiceView
+          receiptSettings={receiptSettings}
           orderNumber={sale.orderNumber}
           createdAt={sale.createdAt}
           customerName={sale.customer?.name ?? null}
           cashierName={sale.cashier.name}
-          items={sale.items.map(
-            (item: (typeof sale.items)[number]) => ({
-              name: item.name,
-              sku: item.sku,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount,
-              tax: item.tax,
-              total: item.total,
-            })
-          )}
+          items={sale.items.map((item: (typeof sale.items)[number]) => ({
+            name: item.name,
+            sku: item.sku,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            tax: item.tax,
+            total: item.total,
+          }))}
           subtotal={sale.subtotal}
           taxAmount={sale.taxAmount}
           discountAmount={sale.discountAmount}

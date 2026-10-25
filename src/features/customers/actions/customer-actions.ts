@@ -1,5 +1,7 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import {
@@ -8,6 +10,7 @@ import {
 } from "../schemas/customer-schema";
 
 export async function getCustomers() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
   return prisma.customer.findMany({
     include: {
       _count: { select: { orders: true } },
@@ -17,6 +20,7 @@ export async function getCustomers() {
 }
 
 export async function getCustomerById(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
   return prisma.customer.findUnique({
     where: { id },
     include: {
@@ -38,6 +42,7 @@ export async function getCustomerById(id: string) {
 }
 
 export async function createCustomerAction(input: CustomerFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
   const validated = customerSchema.safeParse(input);
   if (!validated.success) {
     return {
@@ -78,8 +83,9 @@ export async function createCustomerAction(input: CustomerFormValues) {
 
 export async function updateCustomerAction(
   id: string,
-  input: CustomerFormValues
+  input: CustomerFormValues,
 ) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
   const validated = customerSchema.safeParse(input);
   if (!validated.success) {
     return {
@@ -120,6 +126,7 @@ export async function updateCustomerAction(
 }
 
 export async function deleteCustomerAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
   try {
     const customer = await prisma.customer.findUnique({
       where: { id },
@@ -145,8 +152,12 @@ export async function deleteCustomerAction(id: string) {
 
 export async function addLoyaltyPointsAction(
   customerId: string,
-  points: number
+  points: number,
 ) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
+  if (!Number.isSafeInteger(points) || points <= 0) {
+    return { success: false, error: "Points must be a positive whole number." };
+  }
   try {
     await prisma.customer.update({
       where: { id: customerId },

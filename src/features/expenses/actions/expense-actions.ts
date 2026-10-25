@@ -1,14 +1,21 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import { expenseSchema, type ExpenseFormValues } from "../schemas/expense-schema";
+import {
+  expenseSchema,
+  type ExpenseFormValues,
+} from "../schemas/expense-schema";
 
 export async function getExpenses() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   return prisma.expense.findMany({ orderBy: { createdAt: "desc" } });
 }
 
 export async function getExpenseStats() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const total = await prisma.expense.aggregate({ _sum: { amount: true } });
   const byCategory = await prisma.expense.groupBy({
     by: ["category"],
@@ -19,9 +26,13 @@ export async function getExpenseStats() {
 }
 
 export async function createExpenseAction(input: ExpenseFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = expenseSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   try {
@@ -41,6 +52,7 @@ export async function createExpenseAction(input: ExpenseFormValues) {
 }
 
 export async function deleteExpenseAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   try {
     await prisma.expense.delete({ where: { id } });
     revalidatePath("/expenses");

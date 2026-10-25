@@ -9,9 +9,14 @@ export const purchaseItemSchema = z.object({
 
 export const purchaseSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
-  paymentMethod: z.enum(["CASH", "CARD", "BANK_TRANSFER", "QR", "GIFT_CARD", "MIXED"]).default("CASH"),
+  paymentMethod: z
+    .enum(["CASH", "CARD", "BANK_TRANSFER", "QR", "GIFT_CARD", "MIXED"])
+    .default("CASH"),
   notes: z.string().optional().default(""),
-  items: z.array(purchaseItemSchema).min(1, "At least 1 item required"),
+  items: z
+    .array(purchaseItemSchema)
+    .min(1, "At least 1 item required")
+    .max(500),
 });
 
 export type PurchaseItemInput = z.input<typeof purchaseItemSchema>;

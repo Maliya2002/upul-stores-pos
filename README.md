@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Upul Stores POS
 
-## Getting Started
+A Next.js, React and PostgreSQL point-of-sale development project.
 
-First, run the development server:
+## Local setup (Windows)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Use Node.js 24 and npm. The project includes a local PostgreSQL runner; Docker is not required.
+
+1. Install dependencies: `npm ci`.
+2. In one terminal, run `npm run db:local` and leave it running.
+   - The first run creates a private `.env` with random database credentials and an authentication secret.
+   - PostgreSQL listens only on `127.0.0.1:55432`. Its persistent files live in `.local/postgres`.
+   - Stop it with Ctrl+C. Restarting uses the existing data.
+   - An existing `.env` is never overwritten.
+3. In another terminal:
+   ```powershell
+   npm run db:push
+   npm run db:seed
+   npm run dev
+   ```
+4. Open http://localhost:3000.
+
+The seed creates demo products, staff and customers in the selected development database. Owner login: `admin@upulstores.lk` / `Admin@123`. These are demo credentials, not production accounts. The manager, cashier and inventory demo users are listed by the seed command.
+
+For an existing PostgreSQL server, copy `.env.example` to `.env` and set its connection and authentication secret. Do not run `db:local` for that connection. Neither `.env` nor `.local` belongs in Git.
+
+## Working flows
+
+- Owner, admin, manager, cashier and inventory roles; server actions check current active staff records.
+- Cashiers enter at the POS; inventory staff enter at inventory. Restricted navigation is filtered by role.
+- Product/customer/supplier/catalog management and purchases.
+- Desktop and mobile carts, held orders, coupons, cash change and invoice printing.
+- Checkout calculates prices, tax, discounts and cashier identity on the server.
+- Stock updates, coupon usage, customer totals and orders commit together. Concurrent stock/coupon conflicts return a retry message.
+- Manager refunds validate the remaining paid balance inside a serializable transaction. Full refunds return stock once; partial financial refunds do not return quantities.
+- Dashboard sales, recent invoices and stock alerts come from PostgreSQL, using Asia/Colombo dates.
+- Store and receipt settings are used on invoices. Owner/admin can create cashier accounts from Employees.
+- JSON store-data export. This is not a full restore-capable database backup.
+
+Card, bank and QR options record an externally received payment; the app does not charge a gateway. Gift-card and mixed-tender checkout are not enabled.
+
+## Verification
+
+```powershell
+npm run db:generate
+npm test
+npm run test:integration
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Integration tests require the project-local database at `127.0.0.1:55432/upul_pos`. They call the real server actions against PostgreSQL, replacing only the HTTP session and Next.js cache boundary. Every run creates uniquely named fixtures and removes only those fixtures; it does not reset existing data.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Coverage includes tampered checkout values, invalid quantities, rounding, coupon limits, stock overselling, transaction rollback, concurrent checkout/refunds, inactive staff, and held-cart preservation.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run a compiled build using `npm run build`, then `npm start`, while PostgreSQL is running. System fonts avoid a build-time Google Fonts download.
 
-## Learn More
+## Remaining release work
 
-To learn more about Next.js, take a look at the following resources:
+This is a development build, not a declaration that every module is production-ready.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Configure and implement real email/OTP delivery. Development reset tokens are available locally; production recovery reports that delivery is not configured.
+- Email/WhatsApp notification settings remain a placeholder.
+- Payment gateway processing, gift cards, split payments and variant-level POS sales are not integrated.
+- Employee attendance/payroll/leave screens need an operational workflow review.
+- Partial item returns and refund-adjusted historical profit/report accounting need further work; the dashboard displays invoice totals net of refunds.
+- Add checkout idempotency before relying on automatic network retries or offline synchronization.
+- Replace demo credentials/data, verify all role-specific workflows, and rerun the dependency audit before deployment.
+- Use PostgreSQL `pg_dump` and a tested restore procedure for real backups; the UI export excludes passwords and some related tables.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+No live shop database or external payment service is used by the local setup.

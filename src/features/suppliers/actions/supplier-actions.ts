@@ -1,5 +1,7 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import {
@@ -10,6 +12,7 @@ import {
 } from "../schemas/supplier-schema";
 
 export async function getSuppliers() {
+  await requireStaff();
   return prisma.supplier.findMany({
     include: {
       _count: { select: { products: true, purchases: true } },
@@ -19,11 +22,18 @@ export async function getSuppliers() {
 }
 
 export async function getSupplierById(id: string) {
+  await requireStaff();
   return prisma.supplier.findUnique({
     where: { id },
     include: {
       products: {
-        select: { id: true, name: true, sku: true, sellingPrice: true, quantity: true },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          sellingPrice: true,
+          quantity: true,
+        },
         take: 10,
         orderBy: { name: "asc" },
       },
@@ -57,9 +67,13 @@ export async function getSupplierById(id: string) {
 }
 
 export async function createSupplierAction(input: SupplierFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = supplierSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -78,16 +92,27 @@ export async function createSupplierAction(input: SupplierFormValues) {
     });
 
     revalidatePath("/suppliers");
-    return { success: true, message: "Supplier created.", supplierId: supplier.id };
+    return {
+      success: true,
+      message: "Supplier created.",
+      supplierId: supplier.id,
+    };
   } catch {
     return { success: false, error: "Failed to create supplier." };
   }
 }
 
-export async function updateSupplierAction(id: string, input: SupplierFormValues) {
+export async function updateSupplierAction(
+  id: string,
+  input: SupplierFormValues,
+) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = supplierSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -118,6 +143,7 @@ export async function updateSupplierAction(id: string, input: SupplierFormValues
 }
 
 export async function deleteSupplierAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   try {
     const supplier = await prisma.supplier.findUnique({
       where: { id },
@@ -146,9 +172,13 @@ export async function deleteSupplierAction(id: string) {
 }
 
 export async function addSupplierPaymentAction(input: SupplierPaymentValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = supplierPaymentSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;

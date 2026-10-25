@@ -1,5 +1,7 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import {
@@ -12,6 +14,7 @@ import {
 } from "../utils/product-helpers";
 
 export async function getProductFormOptions() {
+  await requireStaff();
   const [categories, brands, suppliers] = await Promise.all([
     prisma.category.findMany({
       where: { isActive: true },
@@ -34,6 +37,7 @@ export async function getProductFormOptions() {
 }
 
 export async function getProducts() {
+  await requireStaff();
   return prisma.product.findMany({
     include: {
       category: true,
@@ -48,6 +52,7 @@ export async function getProducts() {
 }
 
 export async function getProductById(id: string) {
+  await requireStaff();
   return prisma.product.findUnique({
     where: { id },
     include: {
@@ -104,6 +109,7 @@ function mapVariants(variants: ProductFormValues["variants"] = []) {
 }
 
 export async function createProductAction(input: ProductFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "INVENTORY_STAFF"]);
   const validated = productSchema.safeParse(input);
 
   if (!validated.success) {
@@ -192,8 +198,9 @@ export async function createProductAction(input: ProductFormValues) {
 
 export async function updateProductAction(
   id: string,
-  input: ProductFormValues
+  input: ProductFormValues,
 ) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "INVENTORY_STAFF"]);
   const validated = productSchema.safeParse(input);
 
   if (!validated.success) {
@@ -248,7 +255,9 @@ export async function updateProductAction(
           status: data.status,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
           batchNumber: normalizeOptionalString(data.batchNumber),
-          images: (data.images ?? []).filter((image) => image.trim().length > 0),
+          images: (data.images ?? []).filter(
+            (image) => image.trim().length > 0,
+          ),
           hasVariants: data.hasVariants,
           isActive: data.isActive,
         },
@@ -313,6 +322,7 @@ export async function updateProductAction(
 }
 
 export async function deleteProductAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER", "INVENTORY_STAFF"]);
   try {
     const product = await prisma.product.findUnique({
       where: { id },
