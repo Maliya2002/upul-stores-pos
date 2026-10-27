@@ -10,6 +10,7 @@ const { default: prisma } = await import("../src/lib/prisma.ts");
 const { openShift, recordCashMovement, closeShift } = await import("../src/features/shifts/actions.ts");
 const { serializable } = await import("../src/lib/transaction.ts");
 const { linkActiveShift } = await import("../src/features/shifts/link-shift.ts");
+const { getShiftReconciliation } = await import("../src/features/shifts/reconciliation.ts");
 
 test("cash shifts enforce ownership, replay safety and immutable closing balances", async () => {
   const prefix = `shift-${randomUUID()}`;
@@ -56,6 +57,22 @@ test("cash shifts enforce ownership, replay safety and immutable closing balance
     assert.equal(closed.expectedCash, 1200);
     assert.equal(closed.variance, -10);
     assert.equal(closed.activeCashierId, null);
+    await assert.rejects(getShiftReconciliation({ cashierId: user.id }));
+    await prisma.user.update({ where: { id: other.id }, data: { role: "MANAGER" } });
+    process.env.TEST_STAFF_ID = other.id;
+    const review = await getShiftReconciliation({ cashierId: user.id, status: "difference" });
+    assert.equal(review.count, 1);
+    assert.equal(review.shifts[0].cashSales, 200);
+    assert.equal(review.shifts[0].nonCashSales, 900);
+    assert.equal(review.shifts[0].cashRefunds, 30);
+    assert.equal(review.shifts[0].cashIn, 50);
+    assert.equal(review.shifts[0].cashOut, 20);
+    assert.equal(review.shifts[0].expected, 1200);
+    assert.equal(review.shifts[0].variance, -10);
+    assert.equal((await getShiftReconciliation({ cashierId: user.id, status: "open" })).count, 0);
+    assert.equal((await getShiftReconciliation({ cashierId: other.id })).count, 0);
+    assert.equal((await getShiftReconciliation({ cashierId: user.id, page: 999 })).page, 1);
+    process.env.TEST_STAFF_ID = user.id;
     assert.equal(await serializable(tx => linkActiveShift(tx, user.id)), null);
     assert.ok((await openShift(randomUUID(), 10)).success);
     const active = await prisma.cashShift.findUniqueOrThrow({ where: { activeCashierId: user.id } });

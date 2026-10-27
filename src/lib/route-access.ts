@@ -4,6 +4,7 @@ export function canAccessRoute(path: string, role?: UserRole) {
   if (!role) return false;
   const management = ["OWNER", "ADMIN", "MANAGER"].includes(role);
   const section = path.split("/")[1];
+  if (path === "/shifts/reconciliation" || path.startsWith("/shifts/reconciliation/")) return management;
   if (["register", "settings"].includes(section))
     return role === "OWNER" || role === "ADMIN";
   if (
