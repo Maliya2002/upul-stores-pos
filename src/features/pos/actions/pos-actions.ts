@@ -6,6 +6,7 @@ import { Prisma, type PaymentMethod } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireStaff } from "@/lib/authorization";
 import { serializable } from "@/lib/transaction";
+import { linkActiveShift } from "@/features/shifts/link-shift";
 import {
   fingerprint,
   validateRequestKey,
@@ -222,6 +223,7 @@ export async function createOrderAction(data: {
       }
       const result = await tx.order.create({
         data: {
+          shiftId: await linkActiveShift(tx, cashier.id),
           orderNumber,
           checkoutKey: data.requestKey,
           requestHash,

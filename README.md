@@ -84,3 +84,9 @@ This is a development build, not a declaration that every module is production-r
 - Use PostgreSQL `pg_dump` and a tested restore procedure for real backups; the UI export excludes passwords and some related tables.
 
 No live shop database or external payment service is used by the local setup.
+
+### Cash shifts
+
+Open Cash Shifts from Operations before trading to track your drawer. Each staff member can have one open shift. Cash sales contribute the invoice total (tender less change); card/bank/QR sales do not add cash. Cash refunds are assigned to the open shift of the staff member recording the return, including returns of older invoices. Cash in/out entries require a reason. Closing saves the expected balance, counted cash and difference; a discrepancy requires an explanation. Closed balances cannot be edited.
+
+Shift tracking is opt-in in this release: transactions without an open shift remain unassigned, and historical invoices are not reassigned. A shift represents one staff member’s drawer, not a shared register. Request retries are protected on the server; for cash movements keep the page open when retrying an uncertain response, and check history before re-entering after a reload. The screen shows your last 30 shifts. Manager reconciliation across staff and mandatory shift enforcement are not yet implemented.

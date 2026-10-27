@@ -17,7 +17,7 @@ export function canAccessRoute(path: string, role?: UserRole) {
     ].includes(section)
   )
     return management;
-  if (["pos", "sales", "customers"].includes(section))
+  if (["pos", "sales", "customers", "shifts"].includes(section))
     return role !== "INVENTORY_STAFF";
   if (section === "inventory") return management || role === "INVENTORY_STAFF";
   if (

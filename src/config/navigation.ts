@@ -87,6 +87,7 @@ export const navigationConfig: NavGroup[] = [
   {
     label: "Operations",
     items: [
+      { title: "Cash Shifts", href: "/shifts", icon: Wallet },
       {
         title: "POS",
         href: "/pos",

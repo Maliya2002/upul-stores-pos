@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/authorization";
 import { serializable } from "@/lib/transaction";
+import { linkActiveShift } from "@/features/shifts/link-shift";
 import {
   fingerprint,
   validateRequestKey,
@@ -91,6 +92,7 @@ export async function processItemReturn(data: RefundRequest) {
         data: {
           orderId: order.id,
           amount,
+          shiftId: await linkActiveShift(tx, staff.id),
           reason: data.reason.trim(),
           method: data.method,
           requestKey: data.requestKey,

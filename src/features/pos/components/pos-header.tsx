@@ -47,6 +47,7 @@ export function POSHeader({ onHoldOrder, onShowHeld }: POSHeaderProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" render={<Link href="/shifts" />}>Cash shifts</Button>
         <Badge variant="outline" className="text-xs">
           {itemCount} items in cart
         </Badge>

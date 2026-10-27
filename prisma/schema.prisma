@@ -128,6 +128,7 @@ model User {
   leaves      Leave[]
   auditLogs   AuditLog[]
   refunds     Refund[]
+  cashShifts  CashShift[]
 
   @@map("users")
 }
@@ -355,6 +356,9 @@ model Customer {
 // ─── Orders & POS ─────────────────────────────────────────────
 
 model Order {
+  @@index([shiftId])
+  shiftId       String?
+  shift         CashShift? @relation(fields: [shiftId], references: [id])
   id            String        @id @default(cuid())
   checkoutKey   String?       @unique
   requestHash   String?
@@ -426,6 +430,9 @@ model OrderPayment {
 }
 
 model Refund {
+  @@index([shiftId])
+  shiftId String?
+  shift CashShift? @relation(fields: [shiftId], references: [id])
   id        String   @id @default(cuid())
   orderId   String
   amount    Float
@@ -682,4 +689,38 @@ model Coupon {
   updatedAt     DateTime  @updatedAt
 
   @@map("coupons")
+}
+
+model CashShift {
+  id String @id @default(cuid())
+  cashierId String
+  activeCashierId String? @unique
+  requestKey String @unique
+  openingCash Float
+  openedAt DateTime @default(now())
+  closedAt DateTime?
+  countedCash Float?
+  expectedCash Float?
+  variance Float?
+  closeNote String?
+  revision Int @default(0)
+  cashier User @relation(fields: [cashierId], references: [id])
+  orders Order[]
+  refunds Refund[]
+  movements CashMovement[]
+  @@index([cashierId, openedAt])
+  @@map("cash_shifts")
+}
+
+model CashMovement {
+  id String @id @default(cuid())
+  shiftId String
+  requestKey String @unique
+  direction String
+  amount Float
+  reason String
+  createdAt DateTime @default(now())
+  shift CashShift @relation(fields: [shiftId], references: [id])
+  @@index([shiftId])
+  @@map("cash_movements")
 }
