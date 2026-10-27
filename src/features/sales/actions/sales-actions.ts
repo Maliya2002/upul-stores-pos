@@ -2,10 +2,11 @@
 
 import { requireStaff } from "@/lib/authorization";
 
-import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
-import { CheckoutError, money } from "@/features/pos/utils/checkout";
+import { netSalesSince } from "../utils/net-sales";
+
+import { processItemReturn } from "./return-actions";
+import type { RefundRequest } from "../utils/returns";
 
 export async function getSales() {
   await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
@@ -14,6 +15,7 @@ export async function getSales() {
       customer: { select: { name: true, phone: true } },
       cashier: { select: { name: true } },
       items: true,
+      refunds: { select: { amount: true } },
       _count: { select: { items: true, refunds: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -28,209 +30,57 @@ export async function getSaleById(id: string) {
       customer: true,
       cashier: { select: { name: true, email: true } },
       items: {
+        orderBy: { id: "asc" },
         include: {
+          refundItems: true,
           product: { select: { name: true, images: true } },
         },
       },
       payments: true,
-      refunds: true,
+      refunds: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          items: { include: { orderItem: { select: { name: true } } } },
+          processedBy: { select: { name: true } },
+        },
+      },
     },
   });
 }
 
 export async function getSalesStats() {
   await requireStaff(["OWNER", "ADMIN", "MANAGER", "CASHIER"]);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() - 7);
-
-  const monthStart = new Date(today);
-  monthStart.setDate(1);
-
-  const [todaySales, weekSales, monthSales, totalOrders, totalRefunds] =
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const today = new Date(`${date}T00:00:00+05:30`);
+  const weekStart = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthStart = new Date(`${date.slice(0, 7)}-01T00:00:00+05:30`);
+  const [todaySales, weekSales, monthSales, totalOrders, refunds] =
     await Promise.all([
-      prisma.order.aggregate({
-        _sum: { total: true },
-        _count: true,
-        where: {
-          createdAt: { gte: today },
-          orderStatus: "COMPLETED",
-        },
+      netSalesSince(today),
+      netSalesSince(weekStart),
+      netSalesSince(monthStart),
+      prisma.order.count({
+        where: { orderStatus: { in: ["COMPLETED", "REFUNDED"] } },
       }),
-      prisma.order.aggregate({
-        _sum: { total: true },
-        _count: true,
-        where: {
-          createdAt: { gte: weekStart },
-          orderStatus: "COMPLETED",
-        },
-      }),
-      prisma.order.aggregate({
-        _sum: { total: true },
-        _count: true,
-        where: {
-          createdAt: { gte: monthStart },
-          orderStatus: "COMPLETED",
-        },
-      }),
-      prisma.order.count({ where: { orderStatus: "COMPLETED" } }),
       prisma.refund.aggregate({ _sum: { amount: true }, _count: true }),
     ]);
-
   return {
-    todayRevenue: todaySales._sum.total ?? 0,
-    todayOrders: todaySales._count,
-    weekRevenue: weekSales._sum.total ?? 0,
-    weekOrders: weekSales._count,
-    monthRevenue: monthSales._sum.total ?? 0,
-    monthOrders: monthSales._count,
+    todayRevenue: todaySales.revenue,
+    todayOrders: todaySales.orders,
+    weekRevenue: weekSales.revenue,
+    weekOrders: weekSales.orders,
+    monthRevenue: monthSales.revenue,
+    monthOrders: monthSales.orders,
     totalOrders,
-    totalRefundAmount: totalRefunds._sum.amount ?? 0,
-    totalRefundCount: totalRefunds._count,
+    totalRefundAmount: refunds._sum.amount ?? 0,
+    totalRefundCount: refunds._count,
   };
 }
-
-export async function processRefundAction(
-  orderId: string,
-  amount: number,
-  reason: string,
-) {
-  try {
-    await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
-    if (
-      !Number.isFinite(amount) ||
-      amount <= 0 ||
-      money(amount) !== amount ||
-      typeof reason !== "string" ||
-      !reason.trim() ||
-      reason.length > 2000
-    ) {
-      return {
-        success: false,
-        error:
-          "Enter a positive refund amount (up to two decimals) and a reason.",
-      };
-    }
-    await prisma.$transaction(
-      async (tx) => {
-        const order = await tx.order.findUnique({
-          where: { id: orderId },
-          include: { items: true, refunds: true },
-        });
-
-        if (!order || order.orderStatus !== "COMPLETED")
-          throw new CheckoutError("Order cannot be refunded.");
-
-        const existingRefunds = order.refunds.reduce(
-          (sum, r) => sum + r.amount,
-          0,
-        );
-        const maxRefundable = money(
-          Math.min(order.total, order.paidAmount - order.changeAmount) -
-            existingRefunds,
-        );
-
-        if (amount > maxRefundable) {
-          throw new CheckoutError(
-            `Max refundable: Rs.${maxRefundable.toFixed(2)}`,
-          );
-        }
-
-        await tx.refund.create({
-          data: {
-            orderId,
-            amount,
-            reason,
-            notes: `Refund for order ${order.orderNumber}`,
-          },
-        });
-
-        const totalRefunded = money(existingRefunds + amount);
-        const newStatus =
-          totalRefunded >= order.total ? "REFUNDED" : "COMPLETED";
-
-        await tx.order.update({
-          where: { id: orderId },
-          data: {
-            orderStatus: newStatus,
-            paymentStatus:
-              totalRefunded >= order.total ? "REFUNDED" : "PARTIAL",
-          },
-        });
-
-        // Restore stock for full refund
-        if (totalRefunded >= order.total) {
-          for (const item of order.items) {
-            const product = await tx.product.findUnique({
-              where: { id: item.productId },
-            });
-
-            if (product) {
-              await tx.product.update({
-                where: { id: item.productId },
-                data: { quantity: { increment: item.quantity } },
-              });
-
-              await tx.stockMovement.create({
-                data: {
-                  productId: item.productId,
-                  type: "RETURN",
-                  quantity: item.quantity,
-                  beforeQty: product.quantity,
-                  afterQty: product.quantity + item.quantity,
-                  reference: order.orderNumber,
-                  notes: `Refund: ${reason}`,
-                },
-              });
-            }
-          }
-        }
-
-        // Update customer stats
-        if (order.customerId) {
-          await tx.customer.update({
-            where: { id: order.customerId },
-            data: {
-              totalPurchases: { decrement: amount },
-              loyaltyPoints: {
-                decrement:
-                  Math.floor(totalRefunded / 100) -
-                  Math.floor(existingRefunds / 100),
-              },
-            },
-          });
-        }
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-
-    revalidatePath("/sales");
-    revalidatePath(`/sales/${orderId}`);
-    revalidatePath("/dashboard");
-    revalidatePath("/inventory");
-    revalidatePath("/pos");
-    revalidatePath("/products");
-    revalidatePath("/customers");
-
-    return {
-      success: true,
-      message: `Refund of Rs.${amount.toFixed(2)} processed.`,
-    };
-  } catch (error) {
-    if (error instanceof CheckoutError)
-      return { success: false, error: error.message };
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2034"
-    ) {
-      return {
-        success: false,
-        error:
-          "Another refund or stock update is in progress. Please try again.",
-      };
-    }
-    return { success: false, error: "Failed to process refund." };
-  }
+export async function processRefundAction(data: RefundRequest) {
+  return processItemReturn(data);
 }

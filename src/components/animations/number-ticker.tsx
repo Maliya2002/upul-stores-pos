@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion, useInView, useSpring, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,6 @@ export function NumberTicker({
 }: NumberTickerProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const [hasAnimated, setHasAnimated] = useState(false);
 
   const spring = useSpring(0, {
     mass: 1,
@@ -34,15 +33,14 @@ export function NumberTicker({
 
   const display = useTransform(spring, (val) => {
     const num = decimals > 0 ? val.toFixed(decimals) : Math.round(val);
-    return `${prefix}${Number(num).toLocaleString()}${suffix}`;
+    return `${prefix}${Number(num).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`;
   });
 
   useEffect(() => {
-    if (isInView && !hasAnimated) {
+    if (isInView) {
       spring.set(value);
-      setHasAnimated(true);
     }
-  }, [isInView, hasAnimated, spring, value]);
+  }, [isInView, spring, value]);
 
   return (
     <motion.span ref={ref} className={cn("tabular-nums", className)}>

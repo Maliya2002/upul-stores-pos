@@ -12,33 +12,34 @@ import {
 import { formatDateTime } from "@/lib/utils";
 
 export default async function SalesPage() {
-  const [sales, stats] = await Promise.all([
-    getSales(),
-    getSalesStats(),
-  ]);
+  const [sales, stats] = await Promise.all([getSales(), getSalesStats()]);
 
-  const rows: SaleRow[] = sales.map(
-    (sale: (typeof sales)[number]) => ({
-      id: sale.id,
-      orderNumber: sale.orderNumber,
-      customer: sale.customer?.name ?? "Walk-in",
-      cashier: sale.cashier.name,
-      items: sale._count.items,
-      total: sale.total,
-      paymentMethod: sale.paymentMethod,
-      paymentStatus: sale.paymentStatus,
-      orderStatus: sale.orderStatus,
-      refunds: sale._count.refunds,
-      createdAt: formatDateTime(sale.createdAt),
-    })
-  );
+  const rows: SaleRow[] = sales.map((sale: (typeof sales)[number]) => ({
+    id: sale.id,
+    orderNumber: sale.orderNumber,
+    customer: sale.customer?.name ?? "Walk-in",
+    cashier: sale.cashier.name,
+    items: sale._count.items,
+    total: sale.total,
+    refundedAmount: sale.refunds.reduce(
+      (sum, refund) => sum + refund.amount,
+      0,
+    ),
+    netTotal:
+      sale.total - sale.refunds.reduce((sum, refund) => sum + refund.amount, 0),
+    paymentMethod: sale.paymentMethod,
+    paymentStatus: sale.paymentStatus,
+    orderStatus: sale.orderStatus,
+    refunds: sale._count.refunds,
+    createdAt: formatDateTime(sale.createdAt),
+  }));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Sales"
         badge={`${rows.length} Orders`}
-        description="View all sales, invoices and process refunds."
+        description="View invoices and item returns. Net sales include refunds against the invoices in each period (Asia/Colombo)."
       />
 
       <SalesStats

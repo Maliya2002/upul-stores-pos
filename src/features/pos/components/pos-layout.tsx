@@ -43,6 +43,7 @@ export function POSLayout({ products, customers, cashierId }: POSLayoutProps) {
 
   const handleAddToCart = useCallback(
     (product: POSProduct) => {
+      if (paymentOpen) return;
       if (product.quantity <= 0) {
         toast.error("Product is out of stock.");
         return;
@@ -61,7 +62,7 @@ export function POSLayout({ products, customers, cashierId }: POSLayoutProps) {
 
       toast.success(`${product.name} added to cart`);
     },
-    [addItem],
+    [addItem, paymentOpen],
   );
 
   const handleBarcodeScan = useCallback(
@@ -85,7 +86,7 @@ export function POSLayout({ products, customers, cashierId }: POSLayoutProps) {
     {
       key: "F3",
       callback: () => {
-        if (items.length > 0) {
+        if (!paymentOpen && items.length > 0) {
           holdOrder();
           toast.success("Order held!");
         }
@@ -103,7 +104,7 @@ export function POSLayout({ products, customers, cashierId }: POSLayoutProps) {
     <div className="flex h-dvh flex-col bg-background">
       <POSHeader
         onHoldOrder={() => {
-          if (items.length > 0) {
+          if (!paymentOpen && items.length > 0) {
             holdOrder();
             toast.success("Order held!");
           }

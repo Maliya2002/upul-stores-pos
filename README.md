@@ -14,7 +14,8 @@ Use Node.js 24 and npm. The project includes a local PostgreSQL runner; Docker i
    - An existing `.env` is never overwritten.
 3. In another terminal:
    ```powershell
-   npm run db:push
+   npm run db:migrate
+   npm run db:generate
    npm run db:seed
    npm run dev
    ```
@@ -32,7 +33,12 @@ For an existing PostgreSQL server, copy `.env.example` to `.env` and set its con
 - Desktop and mobile carts, held orders, coupons, cash change and invoice printing.
 - Checkout calculates prices, tax, discounts and cashier identity on the server.
 - Stock updates, coupon usage, customer totals and orders commit together. Concurrent stock/coupon conflicts return a retry message.
-- Manager refunds validate the remaining paid balance inside a serializable transaction. Full refunds return stock once; partial financial refunds do not return quantities.
+- Checkout requests have a unique reference and staff-bound payload fingerprint. Replays return the original invoice; changed payloads cannot reuse the reference. Stock, payments, coupons, customer totals and audit entries are written only once.
+- The payment screen saves an unresolved request in this tab's session storage before sending it. Reloading the POS with the same staff account offers **Retry saved sale**. It retains the original cart and tender while the result is uncertain. Do not collect payment again. This is tab-scoped recovery, not an offline payment queue or recovery after browser storage is cleared.
+- Managers select quantities for item returns, choose the refund method and record a reason. Only received, inspected items explicitly marked for restocking increase sellable stock. Returned quantities cannot exceed the invoice, even with concurrent requests.
+- Refunds use original invoice amounts with discounts allocated in integer cents. Repeated partial returns add up to the exact discounted line total. New sales preserve line-level net amounts and purchase-cost snapshots.
+- Returns have their own replay-safe references, staff attribution, audit entries and invoice history. Older amount-only refunds require manual reconciliation and cannot be mixed with new item returns.
+- Sales totals and invoice rows display net sales after refunds against those invoices; these are invoice-period totals, not a cash-flow report by refund date.
 - Dashboard sales, recent invoices and stock alerts come from PostgreSQL, using Asia/Colombo dates.
 - Store and receipt settings are used on invoices. Owner/admin can create cashier accounts from Employees.
 - JSON store-data export. This is not a full restore-capable database backup.
@@ -54,6 +60,14 @@ Integration tests require the project-local database at `127.0.0.1:55432/upul_po
 
 Coverage includes tampered checkout values, invalid quantities, rounding, coupon limits, stock overselling, transaction rollback, concurrent checkout/refunds, inactive staff, and held-cart preservation.
 
+Additional tests cover concurrent duplicate requests, payload conflicts, exact partial-return amounts, damaged versus restocked returns, staff attribution, net sales and installing all migrations on an empty disposable database. Integration tests need permission to create and drop their generated `pos_migration_test_*` database. GitHub Actions runs tests, lint and the production build against a disposable PostgreSQL service.
+
+## Upgrading the earlier development database
+
+The existing local database has already been baselined and migrated without deleting its demo invoices. Future changes use `npm run db:migrate`; do not use `db:push` to bypass migration history.
+
+For another database created with the earlier `db:push` workflow, back it up and compare its schema with the baseline migration before marking `20261025000000_baseline` as applied using `prisma migrate resolve`. Then run `npm run db:migrate` and `npm run db:generate`. Do not mark a baseline as applied on an empty database; a new database runs both migrations normally. Existing invoice net amounts and costs remain nullable rather than inventing historical purchase costs.
+
 Run a compiled build using `npm run build`, then `npm start`, while PostgreSQL is running. System fonts avoid a build-time Google Fonts download.
 
 ## Remaining release work
@@ -64,8 +78,8 @@ This is a development build, not a declaration that every module is production-r
 - Email/WhatsApp notification settings remain a placeholder.
 - Payment gateway processing, gift cards, split payments and variant-level POS sales are not integrated.
 - Employee attendance/payroll/leave screens need an operational workflow review.
-- Partial item returns and refund-adjusted historical profit/report accounting need further work; the dashboard displays invoice totals net of refunds.
-- Add checkout idempotency before relying on automatic network retries or offline synchronization.
+- Historical profit/report accounting needs further work: the Reports module still requires cost/refund reconciliation. Sales and Dashboard display invoice totals net of refunds; new cost snapshots support the next reporting phase.
+- Multi-terminal/offline reconciliation, cash-drawer shifts, end-of-day closing and recovery across cleared browser sessions require further work.
 - Replace demo credentials/data, verify all role-specific workflows, and rerun the dependency audit before deployment.
 - Use PostgreSQL `pg_dump` and a tested restore procedure for real backups; the UI export excludes passwords and some related tables.
 

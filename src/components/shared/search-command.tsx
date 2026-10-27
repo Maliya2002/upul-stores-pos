@@ -48,14 +48,15 @@ export function SearchCommand() {
     <>
       <Button
         variant="outline"
-        className="relative h-9 w-9 lg:h-9 lg:w-64 lg:justify-start lg:px-3 lg:text-sm"
+        className="relative h-9 w-9 xl:h-9 xl:w-64 xl:justify-start xl:px-3 xl:text-sm"
+        aria-label="Search pages"
         onClick={() => setOpen(true)}
       >
-        <Search className="h-4 w-4 lg:mr-2 shrink-0" />
-        <span className="hidden lg:inline text-muted-foreground">
+        <Search className="h-4 w-4 xl:mr-2 shrink-0" />
+        <span className="hidden xl:inline text-muted-foreground">
           Search...
         </span>
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden lg:flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
+        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden xl:flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
           ⌘K
         </kbd>
       </Button>

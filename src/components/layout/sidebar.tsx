@@ -62,9 +62,9 @@ function SidebarInnerContent({
     }))
     .filter((group) => group.items.length > 0);
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 w-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between px-4 border-b shrink-0">
+      <div className={cn("flex items-center justify-between border-b shrink-0", collapsed ? "flex-col gap-1 px-2 py-2" : "h-16 px-4")}>
         <Logo collapsed={collapsed} />
         {/* ✅ isHydrated වීමෙන් පසු පමණක් show කරන්න */}
         {isHydrated && !isMobile && (
@@ -73,6 +73,7 @@ function SidebarInnerContent({
             size="icon"
             className="h-7 w-7 shrink-0"
             onClick={onToggle}
+            aria-label={isOpen ? "Collapse navigation" : "Expand navigation"}
           >
             {isOpen ? (
               <ChevronLeft className="h-4 w-4" />
@@ -84,9 +85,9 @@ function SidebarInnerContent({
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 py-4">
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden py-4">
         <TooltipProvider>
-          <nav className="px-3 space-y-5">
+          <nav aria-label="Main navigation" className="px-3 space-y-5">
             {visibleNavigation.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {!collapsed && (
@@ -194,7 +195,7 @@ export function Sidebar({
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ type: "spring", damping: 25, stiffness: 250 }}
-            className="fixed left-0 top-0 z-50 h-full w-70 border-r bg-background shadow-2xl lg:hidden"
+            className="fixed left-0 top-0 z-50 h-dvh w-70 max-w-[calc(100vw-2rem)] border-r bg-background shadow-2xl lg:hidden"
           >
             <SidebarInnerContent
               collapsed={false}
@@ -216,7 +217,7 @@ export function Sidebar({
           width: isHydrated ? (isOpen ? 280 : 80) : 280,
         }}
         transition={{ type: "spring", damping: 20, stiffness: 200 }}
-        className="hidden lg:flex fixed left-0 top-0 z-30 h-full flex-col border-r bg-background overflow-hidden"
+        className="hidden lg:flex fixed left-0 top-0 z-30 h-dvh flex-col border-r bg-background overflow-hidden"
       >
         <SidebarInnerContent
           collapsed={collapsed}

@@ -26,14 +26,12 @@ export function POSHeader({ onHoldOrder, onShowHeld }: POSHeaderProps) {
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3"
+      className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 sm:px-4 sm:py-3"
     >
       <div className="flex items-center gap-3">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="icon" className="h-9 w-9">
+        <Button variant="ghost" size="icon" className="h-9 w-9" render={<Link href="/dashboard" aria-label="Back to dashboard" />}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-        </Link>
 
         <div className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 to-purple-600">
@@ -48,7 +46,7 @@ export function POSHeader({ onHoldOrder, onShowHeld }: POSHeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="text-xs">
           {itemCount} items in cart
         </Badge>
@@ -78,7 +76,7 @@ export function POSHeader({ onHoldOrder, onShowHeld }: POSHeaderProps) {
           )}
         </Button>
 
-        <div className="hidden md:flex items-center gap-1 text-[10px] text-muted-foreground border rounded-lg px-2 py-1">
+        <div className="hidden xl:flex items-center gap-1 text-[10px] text-muted-foreground border rounded-lg px-2 py-1">
           <Keyboard className="h-3 w-3" />
           F2 Sale · F3 Hold · F4 Pay
         </div>

@@ -13,6 +13,8 @@ export type SaleRow = {
   cashier: string;
   items: number;
   total: number;
+  refundedAmount: number;
+  netTotal: number;
   paymentMethod: string;
   paymentStatus: string;
   orderStatus: string;
@@ -43,11 +45,20 @@ export function getSaleColumns(): ColumnDef<SaleRow, unknown>[] {
       accessorKey: "total",
       header: "Total",
       cell: ({ row }) => (
-        <CurrencyDisplay
-          amount={row.original.total}
-          className="font-bold"
-        />
+        <CurrencyDisplay amount={row.original.total} className="font-bold" />
       ),
+    },
+    {
+      accessorKey: "refundedAmount",
+      header: "Refunded",
+      cell: ({ row }) => (
+        <CurrencyDisplay amount={row.original.refundedAmount} />
+      ),
+    },
+    {
+      accessorKey: "netTotal",
+      header: "Net sale",
+      cell: ({ row }) => <CurrencyDisplay amount={row.original.netTotal} />,
     },
     {
       accessorKey: "paymentMethod",
@@ -61,9 +72,7 @@ export function getSaleColumns(): ColumnDef<SaleRow, unknown>[] {
     {
       accessorKey: "orderStatus",
       header: "Status",
-      cell: ({ row }) => (
-        <StatusBadge status={row.original.orderStatus} />
-      ),
+      cell: ({ row }) => <StatusBadge status={row.original.orderStatus} />,
     },
     {
       accessorKey: "createdAt",

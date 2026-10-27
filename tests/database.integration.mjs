@@ -59,6 +59,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
   });
   process.env.TEST_STAFF_ID = user.id;
   const input = (overrides = {}) => ({
+    requestKey: randomUUID(),
     items: [
       {
         productId: product.id,
@@ -83,6 +84,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
   });
   try {
     let orderId;
+    let orderItemId;
     await t.test(
       "catalog prices and session identity override forged client values",
       async () => {
@@ -98,6 +100,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
         assert.equal(order.changeAmount, 50);
         assert.equal(order.payments[0].amount, 100);
         assert.equal(order.items[0].name, product.name);
+        orderItemId = order.items[0].id;
         assert.equal(
           (
             await prisma.product.findUniqueOrThrow({
@@ -162,16 +165,44 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
       "refund validation and concurrent refund restore stock once",
       async () => {
         assert.equal(
-          (await processRefundAction(orderId, -1, "Invalid")).success,
+          (
+            await processRefundAction({
+              requestKey: randomUUID(),
+              orderId,
+              reason: "Invalid",
+              method: "CASH",
+              items: [{ orderItemId, quantity: -1, restock: true }],
+            })
+          ).success,
           false,
         );
         assert.equal(
-          (await processRefundAction(orderId, 101, "Too much")).success,
+          (
+            await processRefundAction({
+              requestKey: randomUUID(),
+              orderId,
+              reason: "Too much",
+              method: "CASH",
+              items: [{ orderItemId, quantity: 2, restock: true }],
+            })
+          ).success,
           false,
         );
         const results = await Promise.all([
-          processRefundAction(orderId, 100, "Return"),
-          processRefundAction(orderId, 100, "Return"),
+          processRefundAction({
+            requestKey: randomUUID(),
+            orderId,
+            reason: "Return",
+            method: "CASH",
+            items: [{ orderItemId, quantity: 1, restock: true }],
+          }),
+          processRefundAction({
+            requestKey: randomUUID(),
+            orderId,
+            reason: "Return",
+            method: "CASH",
+            items: [{ orderItemId, quantity: 1, restock: true }],
+          }),
         ]);
         assert.equal(results.filter((result) => result.success).length, 1);
         assert.equal(await prisma.refund.count({ where: { orderId } }), 1);
@@ -184,7 +215,15 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
           1,
         );
         assert.equal(
-          (await processRefundAction(orderId, 1, "Again")).success,
+          (
+            await processRefundAction({
+              requestKey: randomUUID(),
+              orderId,
+              reason: "Again",
+              method: "CASH",
+              items: [{ orderItemId, quantity: 1, restock: true }],
+            })
+          ).success,
           false,
         );
       },
@@ -242,7 +281,15 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
           data: { role: "CASHIER" },
         });
         assert.equal(
-          (await processRefundAction(orderId, 1, "Unauthorized")).success,
+          (
+            await processRefundAction({
+              requestKey: randomUUID(),
+              orderId,
+              reason: "Unauthorized",
+              method: "CASH",
+              items: [{ orderItemId, quantity: 1, restock: true }],
+            })
+          ).success,
           false,
         );
         await assert.rejects(
@@ -286,6 +333,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
     await prisma.customer.delete({ where: { id: customer.id } });
     await prisma.supplier.delete({ where: { id: supplier.id } });
     await prisma.coupon.delete({ where: { id: coupon.id } });
+    await prisma.auditLog.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
     delete process.env.TEST_STAFF_ID;
     await prisma.$disconnect();
