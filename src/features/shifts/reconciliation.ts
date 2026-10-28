@@ -4,12 +4,15 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireStaff } from "@/lib/authorization";
 import { cashBalance } from "./balance";
+import { shiftDateRange } from "./date-range";
 
-export async function getShiftReconciliation(input: { status?: string; cashierId?: string; page?: number } = {}) {
+export async function getShiftReconciliation(input: { status?: string; cashierId?: string; page?: number; from?: string; through?: string } = {}) {
   await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const status = ["open", "closed", "difference"].includes(input.status ?? "") ? input.status : "all";
   const page = Number.isSafeInteger(input.page) && input.page! > 0 ? Math.min(input.page!, 100000) : 1;
+  const range = shiftDateRange(input.from, input.through);
   const where: Prisma.CashShiftWhereInput = {
+    ...(range.error ? { id: { in: [] } } : { openedAt: range.openedAt }),
     ...(input.cashierId ? { cashierId: input.cashierId } : {}),
     ...(status === "open" ? { closedAt: null } : {}),
     ...(status === "closed" ? { closedAt: { not: null } } : {}),
@@ -31,7 +34,7 @@ export async function getShiftReconciliation(input: { status?: string; cashierId
     });
     const cashiers = await tx.user.findMany({ where: { cashShifts: { some: {} } }, select: { id: true, name: true, isActive: true }, orderBy: [{ name: "asc" }, { id: "asc" }] });
     return {
-      count, pages, page: currentPage, cashiers,
+      count, pages, page: currentPage, cashiers, error: range.error,
       shifts: shifts.map(({ orders, refunds, ...shift }) => {
         const sum = (values: number[]) => values.reduce((total, value) => total + Math.round(value * 100), 0) / 100;
         const sales = orders.filter(order => order.paymentMethod === "CASH").map(order => order.total);

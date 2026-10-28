@@ -72,6 +72,22 @@ test("cash shifts enforce ownership, replay safety and immutable closing balance
     assert.equal((await getShiftReconciliation({ cashierId: user.id, status: "open" })).count, 0);
     assert.equal((await getShiftReconciliation({ cashierId: other.id })).count, 0);
     assert.equal((await getShiftReconciliation({ cashierId: user.id, page: 999 })).page, 1);
+    const dateFilter = { cashierId: user.id, status: "difference", from: "2026-10-28", through: "2026-10-28" };
+    for (const [instant, expectedCount] of [
+      ["2026-10-27T18:29:59.999Z", 0],
+      ["2026-10-27T18:30:00.000Z", 1],
+      ["2026-10-28T18:29:59.999Z", 1],
+      ["2026-10-28T18:30:00.000Z", 0],
+    ]) {
+      await prisma.cashShift.update({ where: { id: shift.id }, data: { openedAt: new Date(instant) } });
+      const filtered = await getShiftReconciliation(dateFilter);
+      assert.equal(filtered.count, expectedCount, instant);
+      if (expectedCount) assert.equal(filtered.shifts[0].expected, 1200);
+    }
+    const invalidDates = await getShiftReconciliation({ cashierId: user.id, from: "2026-02-30" });
+    assert.ok(invalidDates.error);
+    assert.equal(invalidDates.count, 0);
+    assert.equal(invalidDates.shifts.length, 0);
     process.env.TEST_STAFF_ID = user.id;
     assert.equal(await serializable(tx => linkActiveShift(tx, user.id)), null);
     assert.ok((await openShift(randomUUID(), 10)).success);

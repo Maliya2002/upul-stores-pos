@@ -8,17 +8,22 @@ export default async function ReconciliationPage({ searchParams }: { searchParam
   const params = await searchParams;
   const status = typeof params.status === "string" && ["open", "closed", "difference"].includes(params.status) ? params.status : "all";
   const cashierId = typeof params.cashierId === "string" ? params.cashierId : "";
-  const data = await getShiftReconciliation({ status, cashierId, page: Number(params.page) });
-  const pageUrl = (page: number) => `/shifts/reconciliation?${new URLSearchParams({ status, cashierId, page: String(page) })}`;
+  const from = typeof params.from === "string" ? params.from : "";
+  const through = typeof params.through === "string" ? params.through : "";
+  const data = await getShiftReconciliation({ status, cashierId, from, through, page: Number(params.page) });
+  const pageUrl = (page: number) => `/shifts/reconciliation?${new URLSearchParams({ status, cashierId, from, through, page: String(page) })}`;
   return <div className="space-y-6">
     <header className="space-y-2"><Link href="/shifts" className="text-sm underline">My cash shifts</Link><h1 className="text-2xl font-bold">Shift reconciliation</h1><p className="text-sm text-muted-foreground">Review all staff drawers. Closed shifts show the saved closing balance. Times are Asia/Colombo.</p></header>
-    <form key={`${status}:${cashierId}`} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+    <form key={JSON.stringify([status, cashierId, from, through])} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+      <label className="flex min-w-0 max-w-full flex-col gap-1">Opened from<input type="date" name="from" min="2007-01-01" max={through || "9999-12-31"} defaultValue={from} className="h-10 min-w-0 max-w-full rounded border bg-background px-3" /></label>
+      <label className="flex min-w-0 max-w-full flex-col gap-1">Opened through<input type="date" name="through" min={from || "2007-01-01"} max="9999-12-31" defaultValue={through} className="h-10 min-w-0 max-w-full rounded border bg-background px-3" /></label>
       <label className="flex min-w-0 flex-col gap-1">Status<select name="status" defaultValue={status} className="h-10 rounded border bg-background px-3"><option value="all">All shifts</option><option value="open">Open</option><option value="closed">Closed</option><option value="difference">Cash difference</option></select></label>
       <label className="flex min-w-0 max-w-full flex-col gap-1">Cashier<select name="cashierId" defaultValue={cashierId} className="h-10 max-w-full rounded border bg-background px-3"><option value="">All staff</option>{data.cashiers.map(c => <option key={c.id} value={c.id}>{c.name}{c.isActive ? "" : " (inactive)"}</option>)}</select></label>
       <button type="submit" className="h-10 rounded bg-primary px-4 text-primary-foreground">Apply filters</button><Link href="/shifts/reconciliation" className="p-2 underline">Reset</Link>
     </form>
-    <p className="text-sm">{data.count} matching shifts · Page {data.page} of {data.pages}</p>
-    {data.shifts.length === 0 && <p className="rounded-lg border p-6">No shifts match these filters.</p>}
+    <p className="text-sm text-muted-foreground">Dates filter when a shift opened, including both selected days in Asia/Colombo. Balances include the entire shift.</p>
+    {data.error ? <p role="alert" className="rounded-lg border border-destructive p-4 text-destructive">{data.error}</p> : <p className="text-sm">{data.count} matching shifts · Page {data.page} of {data.pages}</p>}
+    {!data.error && data.shifts.length === 0 && <p className="rounded-lg border p-6">No shifts match these filters.</p>}
     <div className="space-y-4">{data.shifts.map(s => <article key={s.id} className="min-w-0 space-y-3 rounded-lg border p-4">
       <header className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold break-words">{s.cashier.name}</h2><span>{s.closedAt ? "Closed" : "Open"}{s.closedAt && s.variance !== 0 ? (s.variance! < 0 ? " · Shortage" : " · Overage") : ""}</span></header>
       <p className="text-sm">Opened {date(s.openedAt)}{s.closedAt ? ` · Closed ${date(s.closedAt)}` : ""}</p>
