@@ -31,7 +31,7 @@ Verified with pure arithmetic/date tests and PostgreSQL integration fixtures for
 
 The existing fully received/fully paid purchase action now requires a UUID request reference. A unique database key and staff/payload fingerprint prevent repeated stock increments on retry; serializable retries re-read the receipt. Purchase, stock history, supplier order count and staff audit entry commit together. The form retains an unresolved request in session storage and restores it after reload. Clear browser storage/new tabs do not preserve that recovery context: inspect purchase history before re-entering an uncertain receipt.
 
-This form records cash-paid goods already received. Pending orders, partial receiving, supplier credit/payments and stock-adjustment replay protection remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
+This form records cash-paid goods already received. Pending orders, partial receiving, supplier credit/payments and stock valuation remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
 
 Validation: 9 database integration checks, empty-database migration, targeted lint, TypeScript and Webpack production build passed. Default Turbopack build ran out of disk space; generated caches were removed. Browser acceptance remains pending. Free C: space remained approximately 220 MB after the build; more space is needed for reliable development.
 
@@ -39,6 +39,10 @@ Validation: 9 database integration checks, empty-database migration, targeted li
 
 Manual stock-in now records count adjustments, while stock-out allows damaged, expired or count-correction movements. Purchases, sales and customer returns must use their dedicated workflows. A reason is mandatory; inactive products, fractional/unbounded amounts and negative resulting stock are rejected. Product update, movement and staff audit record commit atomically. Optimistic quantity checks reject conflicting writes. Absolute count actions require the previously observed quantity and refuse stale counts.
 
-The client prevents simultaneous clicks and reports uncertain outcomes explicitly. Server-side replay keys for manual adjustments remain outstanding: check movement history before retrying an uncertain submission. No new physical-count UI was added. Damaged/expired stock valuation in profit reports remains future work.
+The client prevents simultaneous clicks and retains an unresolved request in session storage per stock direction. Reloading the same tab restores the payload for confirmation. Server-side unique keys bind each request to its staff member, direction and validated payload; altered replays are rejected. Serializable transactions apply stock, movement history and audit records once. Physical counts (including unchanged counts) also record replay references so retries cannot overwrite subsequent stock activity. No new physical-count UI was added. Damaged/expired stock valuation in profit reports remains future work. Cleared storage or another browser/tab does not carry the pending reference; check movement history before re-entering.
 
 Stock validation: 10 database integration checks passed, including competing stock removals, stale counts, audit history and role checks. Targeted lint has no errors (3 existing-style warnings); Webpack production build passed. Browser acceptance remains pending.
+
+Stock retry verification: 11 database/migration test entries passed, including concurrent identical requests, changed-payload/direction rejection and replaying an unchanged count after later stock activity. Browser refresh/recovery visual acceptance remains pending.
+
+Retry build verification: Webpack production build passed. Targeted lint passed with the same 3 warnings.

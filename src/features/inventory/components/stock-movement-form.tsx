@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -52,6 +52,7 @@ export function StockMovementForm({
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<StockMovementInput, unknown, StockMovementValues>({
     resolver: zodResolver(stockMovementSchema),
@@ -64,6 +65,23 @@ export function StockMovementForm({
     },
   });
 
+  const storageKey = `pending-stock-${mode}-v1`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        reset(JSON.parse(saved).values);
+        toast.info(
+          "Pending stock adjustment restored. Submit to confirm the same request.",
+        );
+      }
+    } catch {
+      toast.error(
+        "Could not restore adjustment. Check movement history before proceeding.",
+      );
+    }
+  }, [reset, storageKey]);
+
   const selectedProductId = (watch("productId") ?? "") as string;
   const selectedProduct = selectedProductId
     ? products.find((p) => p.id === selectedProductId)
@@ -75,20 +93,35 @@ export function StockMovementForm({
     startTransition(async () => {
       try {
         const action = mode === "in" ? stockInAction : stockOutAction;
-        const result = await action(values);
+        const saved = sessionStorage.getItem(storageKey);
+        const pending = saved
+          ? JSON.parse(saved)
+          : { key: crypto.randomUUID(), values };
+        if (
+          saved &&
+          JSON.stringify(stockMovementSchema.parse(pending.values)) !==
+            JSON.stringify(values)
+        ) {
+          toast.error(
+            "An adjustment is awaiting confirmation. Reload to restore it and confirm it before making changes.",
+          );
+          return;
+        }
+        sessionStorage.setItem(storageKey, JSON.stringify(pending));
+        const result = await action(values, pending.key);
 
         if (!result.success) {
+          if (!result.retryable) sessionStorage.removeItem(storageKey);
           toast.error(result.error || "Failed.");
           return;
         }
 
+        sessionStorage.removeItem(storageKey);
         toast.success(result.message || "Stock updated.");
         router.push("/inventory");
         router.refresh();
       } catch {
-        toast.error(
-          "Outcome unconfirmed. Check movement history before submitting again.",
-        );
+        toast.error("Outcome unconfirmed. Retry this same adjustment.");
       } finally {
         busy.current = false;
       }
@@ -98,8 +131,8 @@ export function StockMovementForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <p className="rounded-lg border p-4 text-sm">
         Manual stock correction only. Record purchases and customer returns in
-        their respective workflows. If the result is uncertain, check movement
-        history before submitting again.
+        their respective workflows. Pending adjustments are restored after
+        reload in this tab. Retry the same adjustment to confirm its outcome.
       </p>
       <FormSection
         title={mode === "in" ? "Stock In Details" : "Stock Out Details"}

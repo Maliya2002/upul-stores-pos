@@ -470,6 +470,8 @@ model RefundItem {
 // ─── Inventory ────────────────────────────────────────────────
 
 model StockMovement {
+  requestKey String? @unique
+  requestHash String?
   id          String            @id @default(cuid())
   productId   String
   type        StockMovementType

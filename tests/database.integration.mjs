@@ -18,8 +18,12 @@ const { processRefundAction } =
   await import("../src/features/sales/actions/sales-actions.ts");
 const { createPurchaseAction } =
   await import("../src/features/purchases/actions/purchase-actions.ts");
-const { stockAdjustAction, stockInAction, stockOutAction } =
+const { stockAdjustAction: adjustRaw, stockInAction: inRaw, stockOutAction: outRaw } =
   await import("../src/features/inventory/actions/inventory-actions.ts");
+
+const stockInAction = data => inRaw(data, randomUUID());
+const stockOutAction = data => outRaw(data, randomUUID());
+const stockAdjustAction = (id, qty, notes, expected) => adjustRaw(id, qty, notes, expected, randomUUID());
 
 test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and access", async (t) => {
   const prefix = "integration-" + randomUUID();
@@ -293,6 +297,22 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
       const logs = await prisma.auditLog.findMany({ where: { userId: user.id, action: "STOCK_ADJUSTED" } });
       assert.equal(logs.length, 2);
       assert.equal(JSON.parse(logs[0].newValues).reason, data.notes);
+      const requestKey = randomUUID();
+      const repeats = await Promise.all([inRaw(data, requestKey), inRaw(data, requestKey)]);
+      assert.ok(repeats.every(r => r.success && r.movementId === repeats[0].movementId));
+      assert.equal(await prisma.stockMovement.count({ where: { requestKey } }), 1);
+      assert.equal(await prisma.auditLog.count({ where: { entityId: repeats[0].movementId } }), 1);
+      assert.equal((await inRaw({ ...data, quantity: 3 }, requestKey)).success, false);
+      assert.equal((await outRaw(data, requestKey)).success, false);
+      assert.equal((await inRaw(data)).success, false);
+      assert.equal((await stockOutAction(data)).success, true);
+      const countKey = randomUUID();
+      assert.equal((await adjustRaw(product.id, before, "Count unchanged", before, countKey)).success, true);
+      assert.equal((await stockInAction(data)).success, true);
+      assert.equal((await adjustRaw(product.id, before, "Count unchanged", before, countKey)).success, true);
+      assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).quantity, before + 2);
+      assert.equal((await stockOutAction(data)).success, true);
+
       const competing = await Promise.all([stockOutAction({ ...data, quantity: before }), stockOutAction({ ...data, quantity: before })]);
       assert.equal(competing.filter(r => r.success).length, 1);
       assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).quantity, 0);

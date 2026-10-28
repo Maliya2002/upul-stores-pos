@@ -4,6 +4,14 @@ import { requireStaff } from "@/lib/authorization";
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
+import { serializable } from "@/lib/transaction";
+import {
+  fingerprint,
+  validateRequestKey,
+  verifyReplay,
+  RequestConflict,
+} from "@/lib/idempotency";
+import { CheckoutError } from "@/features/pos/utils/checkout";
 import {
   stockMovementSchema,
   type StockMovementValues,
@@ -142,187 +150,10 @@ export async function getExpiredProducts() {
 
 /* ── Stock In ────────────────────────────── */
 
-export async function stockInAction(input: StockMovementValues) {
-  const staff = await requireStaff([
-    "OWNER",
-    "ADMIN",
-    "MANAGER",
-    "INVENTORY_STAFF",
-  ]);
-  const validated = stockMovementSchema.safeParse(input);
-  if (!validated.success) {
-    return {
-      success: false,
-      error: validated.error.issues[0]?.message ?? "Invalid data",
-    };
-  }
-
-  const data = validated.data;
-  if (!data.notes.trim())
-    return { success: false, error: "A reason is required." };
-
-  if (data.type !== "ADJUSTMENT")
-    return {
-      success: false,
-      error: "Use the purchase or return workflow to receive those goods.",
-    };
-  try {
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
-    });
-
-    if (!product || !product.isActive)
-      return { success: false, error: "Product not found." };
-
-    if (product.quantity + data.quantity > 2147483647)
-      return { success: false, error: "Stock exceeds the supported quantity." };
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.product.updateMany({
-        where: { id: data.productId, quantity: product.quantity },
-        data: { quantity: { increment: data.quantity } },
-      });
-      if (updated.count !== 1) throw new Error("Stock changed. Try again.");
-
-      const movement = await tx.stockMovement.create({
-        data: {
-          productId: data.productId,
-          type: data.type,
-          quantity: data.quantity,
-          beforeQty: product.quantity,
-          afterQty: product.quantity + data.quantity,
-          reference: data.reference?.trim() || null,
-          notes: data.notes?.trim() || null,
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          userId: staff.id,
-          action: "STOCK_ADJUSTED",
-          entity: "StockMovement",
-          entityId: movement.id,
-          oldValues: JSON.stringify({ quantity: movement.beforeQty }),
-          newValues: JSON.stringify({
-            productId: movement.productId,
-            quantity: movement.afterQty,
-            reason: movement.notes,
-          }),
-        },
-      });
-    });
-
-    revalidatePath("/pos");
-    revalidatePath("/inventory");
-    revalidatePath("/products");
-    return {
-      success: true,
-      message: `${data.quantity} units added to ${product.name}.`,
-    };
-  } catch {
-    return {
-      success: false,
-      error:
-        "Stock update unconfirmed. Check movement history before submitting again.",
-    };
-  }
-}
-
-/* ── Stock Out ───────────────────────────── */
-
-export async function stockOutAction(input: StockMovementValues) {
-  const staff = await requireStaff([
-    "OWNER",
-    "ADMIN",
-    "MANAGER",
-    "INVENTORY_STAFF",
-  ]);
-  const validated = stockMovementSchema.safeParse(input);
-  if (!validated.success) {
-    return {
-      success: false,
-      error: validated.error.issues[0]?.message ?? "Invalid data",
-    };
-  }
-
-  const data = validated.data;
-  if (!data.notes.trim())
-    return { success: false, error: "A reason is required." };
-
-  if (!["ADJUSTMENT", "DAMAGED", "EXPIRED"].includes(data.type))
-    return {
-      success: false,
-      error: "Use the sales workflow for sales and customer returns.",
-    };
-  try {
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
-    });
-
-    if (!product || !product.isActive)
-      return { success: false, error: "Product not found." };
-
-    if (product.quantity < data.quantity) {
-      return {
-        success: false,
-        error: `Not enough stock. Available: ${product.quantity}`,
-      };
-    }
-
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.product.updateMany({
-        where: { id: data.productId, quantity: product.quantity },
-        data: { quantity: { decrement: data.quantity } },
-      });
-      if (updated.count !== 1) throw new Error("Stock changed. Try again.");
-
-      const movement = await tx.stockMovement.create({
-        data: {
-          productId: data.productId,
-          type: data.type,
-          quantity: data.quantity,
-          beforeQty: product.quantity,
-          afterQty: product.quantity - data.quantity,
-          reference: data.reference?.trim() || null,
-          notes: data.notes?.trim() || null,
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          userId: staff.id,
-          action: "STOCK_ADJUSTED",
-          entity: "StockMovement",
-          entityId: movement.id,
-          oldValues: JSON.stringify({ quantity: movement.beforeQty }),
-          newValues: JSON.stringify({
-            productId: movement.productId,
-            quantity: movement.afterQty,
-            reason: movement.notes,
-          }),
-        },
-      });
-    });
-
-    revalidatePath("/pos");
-    revalidatePath("/inventory");
-    revalidatePath("/products");
-    return {
-      success: true,
-      message: `${data.quantity} units removed from ${product.name}.`,
-    };
-  } catch {
-    return {
-      success: false,
-      error:
-        "Stock update unconfirmed. Check movement history before submitting again.",
-    };
-  }
-}
-
-/* ── Stock Adjustment ────────────────────── */
-
-export async function stockAdjustAction(
-  productId: string,
-  newQuantity: number,
-  notes?: string,
+async function mutateStock(
+  input: StockMovementValues,
+  mode: "in" | "out" | "count",
+  requestKey: string,
   expectedQuantity?: number,
 ) {
   const staff = await requireStaff([
@@ -331,52 +162,86 @@ export async function stockAdjustAction(
     "MANAGER",
     "INVENTORY_STAFF",
   ]);
-  if (
-    !Number.isSafeInteger(newQuantity) ||
-    newQuantity < 0 ||
-    newQuantity > 2147483647 ||
-    !Number.isSafeInteger(expectedQuantity) ||
-    expectedQuantity! < 0 ||
-    typeof notes !== "string" ||
-    !notes.trim() ||
-    notes.length > 2000
-  ) {
-    return {
-      success: false,
-      error: "Stock must be a non-negative whole number.",
-    };
-  }
   try {
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
+    validateRequestKey(requestKey);
+    // Counts may legitimately be zero; movement quantities must be positive.
+    const parsed = stockMovementSchema.safeParse(
+      mode === "count" ? { ...input, quantity: 1 } : input,
+    );
+    if (!parsed.success)
+      throw new CheckoutError(
+        parsed.error.issues[0]?.message ?? "Invalid adjustment.",
+      );
+    const data = {
+      ...parsed.data,
+      quantity: mode === "count" ? input.quantity : parsed.data.quantity,
+    };
+    if (
+      mode === "count" &&
+      (!Number.isSafeInteger(data.quantity) ||
+        data.quantity < 0 ||
+        data.quantity > 2147483647 ||
+        !Number.isSafeInteger(expectedQuantity) ||
+        expectedQuantity! < 0 ||
+        expectedQuantity! > 2147483647)
+    )
+      throw new CheckoutError(
+        "Provide valid counts and refresh before counting.",
+      );
+    if (
+      !(
+        mode === "out" ? ["ADJUSTMENT", "DAMAGED", "EXPIRED"] : ["ADJUSTMENT"]
+      ).includes(data.type)
+    )
+      throw new CheckoutError(
+        "Use the purchase or sales workflow for purchases, sales and returns.",
+      );
+    const hash = fingerprint({
+      staff: staff.id,
+      mode,
+      ...data,
+      reference: data.reference.trim(),
+      expectedQuantity,
     });
-
-    if (!product || !product.isActive)
-      return { success: false, error: "Product not found." };
-
-    if (product.quantity !== expectedQuantity)
-      return {
-        success: false,
-        error: "Stock changed. Refresh and recount before adjusting.",
-      };
-    if (product.quantity === newQuantity)
-      return { success: true, message: "Stock count unchanged." };
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.product.updateMany({
-        where: { id: productId, quantity: product.quantity },
-        data: { quantity: newQuantity },
+    const result = await serializable(async (tx) => {
+      const replay = await tx.stockMovement.findUnique({
+        where: { requestKey },
       });
-      if (updated.count !== 1) throw new Error("Stock changed. Try again.");
-
+      if (replay) {
+        verifyReplay(replay.requestHash, hash);
+        return replay;
+      }
+      const product = await tx.product.findFirst({
+        where: { id: data.productId, isActive: true },
+      });
+      if (!product) throw new CheckoutError("Product is unavailable.");
+      if (mode === "count" && product.quantity !== expectedQuantity)
+        throw new CheckoutError(
+          "Stock changed. Refresh and recount before adjusting.",
+        );
+      const afterQty =
+        mode === "count"
+          ? data.quantity
+          : product.quantity + (mode === "in" ? data.quantity : -data.quantity);
+      if (afterQty < 0 || afterQty > 2147483647)
+        throw new CheckoutError(
+          "Resulting stock is outside the supported range.",
+        );
+      await tx.product.update({
+        where: { id: product.id },
+        data: { quantity: afterQty },
+      });
       const movement = await tx.stockMovement.create({
         data: {
-          productId,
-          type: "ADJUSTMENT",
-          quantity: Math.abs(newQuantity - product.quantity),
+          requestKey,
+          requestHash: hash,
+          productId: product.id,
+          type: data.type,
+          quantity: Math.abs(afterQty - product.quantity),
           beforeQty: product.quantity,
-          afterQty: newQuantity,
-          reference: "MANUAL_ADJUSTMENT",
-          notes: notes?.trim() || "Manual stock adjustment",
+          afterQty,
+          notes: data.notes,
+          reference: data.reference.trim() || null,
         },
       });
       await tx.auditLog.create({
@@ -385,24 +250,67 @@ export async function stockAdjustAction(
           action: "STOCK_ADJUSTED",
           entity: "StockMovement",
           entityId: movement.id,
-          oldValues: JSON.stringify({ quantity: movement.beforeQty }),
+          oldValues: JSON.stringify({ quantity: product.quantity }),
           newValues: JSON.stringify({
-            productId: movement.productId,
-            quantity: movement.afterQty,
-            reason: movement.notes,
+            productId: product.id,
+            quantity: afterQty,
+            reason: data.notes,
+            mode,
           }),
         },
       });
+      return movement;
     });
-
-    revalidatePath("/pos");
-    revalidatePath("/inventory");
-    revalidatePath("/products");
+    for (const path of ["/inventory", "/products", "/pos"])
+      revalidatePath(path);
     return {
       success: true,
-      message: `${product.name} adjusted to ${newQuantity} units.`,
+      retryable: false,
+      movementId: result.id,
+      message: "Stock adjustment recorded.",
     };
-  } catch {
-    return { success: false, error: "Failed to adjust stock." };
+  } catch (error) {
+    return {
+      success: false,
+      retryable:
+        error instanceof RequestConflict || !(error instanceof CheckoutError),
+      error:
+        error instanceof CheckoutError
+          ? error.message
+          : "Outcome unconfirmed. Retry the same request.",
+    };
   }
+}
+
+export async function stockInAction(
+  input: StockMovementValues,
+  requestKey = "",
+) {
+  return mutateStock(input, "in", requestKey);
+}
+export async function stockOutAction(
+  input: StockMovementValues,
+  requestKey = "",
+) {
+  return mutateStock(input, "out", requestKey);
+}
+export async function stockAdjustAction(
+  productId: string,
+  newQuantity: number,
+  notes?: string,
+  expectedQuantity?: number,
+  requestKey = "",
+) {
+  return mutateStock(
+    {
+      productId,
+      quantity: newQuantity,
+      notes: notes ?? "",
+      reference: "MANUAL_COUNT",
+      type: "ADJUSTMENT",
+    },
+    "count",
+    requestKey,
+    expectedQuantity,
+  );
 }
