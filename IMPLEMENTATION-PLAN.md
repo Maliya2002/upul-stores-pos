@@ -34,3 +34,11 @@ The existing fully received/fully paid purchase action now requires a UUID reque
 This form records cash-paid goods already received. Pending orders, partial receiving, supplier credit/payments and stock-adjustment replay protection remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
 
 Validation: 9 database integration checks, empty-database migration, targeted lint, TypeScript and Webpack production build passed. Default Turbopack build ran out of disk space; generated caches were removed. Browser acceptance remains pending. Free C: space remained approximately 220 MB after the build; more space is needed for reliable development.
+
+## Manual stock safety
+
+Manual stock-in now records count adjustments, while stock-out allows damaged, expired or count-correction movements. Purchases, sales and customer returns must use their dedicated workflows. A reason is mandatory; inactive products, fractional/unbounded amounts and negative resulting stock are rejected. Product update, movement and staff audit record commit atomically. Optimistic quantity checks reject conflicting writes. Absolute count actions require the previously observed quantity and refuse stale counts.
+
+The client prevents simultaneous clicks and reports uncertain outcomes explicitly. Server-side replay keys for manual adjustments remain outstanding: check movement history before retrying an uncertain submission. No new physical-count UI was added. Damaged/expired stock valuation in profit reports remains future work.
+
+Stock validation: 10 database integration checks passed, including competing stock removals, stale counts, audit history and role checks. Targeted lint has no errors (3 existing-style warnings); Webpack production build passed. Browser acceptance remains pending.

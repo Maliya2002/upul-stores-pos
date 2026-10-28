@@ -18,7 +18,7 @@ const { processRefundAction } =
   await import("../src/features/sales/actions/sales-actions.ts");
 const { createPurchaseAction } =
   await import("../src/features/purchases/actions/purchase-actions.ts");
-const { stockAdjustAction } =
+const { stockAdjustAction, stockInAction, stockOutAction } =
   await import("../src/features/inventory/actions/inventory-actions.ts");
 
 test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and access", async (t) => {
@@ -278,6 +278,37 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
         );
       },
     );
+    await t.test("manual stock changes require reasons, valid directions and fresh counts", async () => {
+      const before = (await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).quantity;
+      const data = { productId: product.id, type: "ADJUSTMENT", quantity: 2, reference: prefix, notes: "Verified count correction" };
+      assert.equal((await stockInAction({ ...data, notes: " " })).success, false);
+      assert.equal((await stockInAction({ ...data, type: "DAMAGED" })).success, false);
+      assert.equal((await stockOutAction({ ...data, type: "SALE" })).success, false);
+      assert.equal((await stockInAction({ ...data, quantity: 1.5 })).success, false);
+      assert.equal((await stockInAction(data)).success, true);
+      assert.equal((await stockAdjustAction(product.id, before, "Count", before)).success, false);
+      assert.equal((await stockOutAction({ ...data, quantity: before + 3 })).success, false);
+      assert.equal((await stockOutAction({ ...data, type: "DAMAGED" })).success, true);
+      assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).quantity, before);
+      const logs = await prisma.auditLog.findMany({ where: { userId: user.id, action: "STOCK_ADJUSTED" } });
+      assert.equal(logs.length, 2);
+      assert.equal(JSON.parse(logs[0].newValues).reason, data.notes);
+      const competing = await Promise.all([stockOutAction({ ...data, quantity: before }), stockOutAction({ ...data, quantity: before })]);
+      assert.equal(competing.filter(r => r.success).length, 1);
+      assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).quantity, 0);
+      assert.equal((await stockInAction({ ...data, quantity: before })).success, true);
+
+      await prisma.product.update({ where: { id: product.id }, data: { isActive: false } });
+      assert.equal((await stockInAction(data)).success, false);
+      assert.equal((await stockOutAction(data)).success, false);
+      await prisma.product.update({ where: { id: product.id }, data: { isActive: true } });
+      assert.equal((await stockAdjustAction(product.id, before + 1, "Physical recount", before)).success, true);
+      assert.equal((await stockAdjustAction(product.id, before, "Restore", before + 1)).success, true);
+      await prisma.user.update({ where: { id: user.id }, data: { role: "CASHIER" } });
+      await assert.rejects(stockInAction(data));
+      await assert.rejects(stockOutAction(data));
+      await prisma.user.update({ where: { id: user.id }, data: { role: "MANAGER" } });
+    });
     await t.test(
       "invalid adjustments fail and cashiers cannot purchase or refund",
       async () => {

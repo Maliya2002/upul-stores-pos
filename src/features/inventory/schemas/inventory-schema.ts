@@ -11,9 +11,13 @@ export const stockMovementSchema = z.object({
     "EXPIRED",
     "RETURN",
   ]),
-  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
-  reference: z.string().optional().default(""),
-  notes: z.string().optional().default(""),
+  quantity: z.coerce
+    .number()
+    .int()
+    .min(1, "Quantity must be at least 1")
+    .max(1000000),
+  reference: z.string().max(200).optional().default(""),
+  notes: z.string().trim().min(1, "A reason is required").max(2000),
 });
 
 export type StockMovementInput = z.input<typeof stockMovementSchema>;

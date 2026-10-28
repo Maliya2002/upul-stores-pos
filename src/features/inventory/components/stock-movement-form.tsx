@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +44,7 @@ export function StockMovementForm({
   products,
 }: StockMovementFormProps) {
   const router = useRouter();
+  const busy = useRef(false);
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -54,13 +55,13 @@ export function StockMovementForm({
     formState: { errors },
   } = useForm<StockMovementInput, unknown, StockMovementValues>({
     resolver: zodResolver(stockMovementSchema),
-  defaultValues: {
-  productId: "",
-  type: defaultType as StockMovementValues["type"],
-  quantity: 1,
-  reference: "",
-  notes: "",
-},
+    defaultValues: {
+      productId: "",
+      type: defaultType as StockMovementValues["type"],
+      quantity: 1,
+      reference: "",
+      notes: "",
+    },
   });
 
   const selectedProductId = (watch("productId") ?? "") as string;
@@ -68,23 +69,38 @@ export function StockMovementForm({
     ? products.find((p) => p.id === selectedProductId)
     : null;
 
-const onSubmit = (values: StockMovementValues) => {
-  startTransition(async () => {
-    const action = mode === "in" ? stockInAction : stockOutAction;
-    const result = await action(values);
+  const onSubmit = (values: StockMovementValues) => {
+    if (busy.current) return;
+    busy.current = true;
+    startTransition(async () => {
+      try {
+        const action = mode === "in" ? stockInAction : stockOutAction;
+        const result = await action(values);
 
-    if (!result.success) {
-      toast.error(result.error || "Failed.");
-      return;
-    }
+        if (!result.success) {
+          toast.error(result.error || "Failed.");
+          return;
+        }
 
-    toast.success(result.message || "Stock updated.");
-    router.push("/inventory");
-    router.refresh();
-  });
-};
+        toast.success(result.message || "Stock updated.");
+        router.push("/inventory");
+        router.refresh();
+      } catch {
+        toast.error(
+          "Outcome unconfirmed. Check movement history before submitting again.",
+        );
+      } finally {
+        busy.current = false;
+      }
+    });
+  };
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <p className="rounded-lg border p-4 text-sm">
+        Manual stock correction only. Record purchases and customer returns in
+        their respective workflows. If the result is uncertain, check movement
+        history before submitting again.
+      </p>
       <FormSection
         title={mode === "in" ? "Stock In Details" : "Stock Out Details"}
         description={
@@ -143,6 +159,19 @@ const onSubmit = (values: StockMovementValues) => {
           )}
 
           <div className="space-y-2">
+            {mode === "out" && (
+              <label className="flex flex-col gap-1 mb-3">
+                Reason category
+                <select
+                  className="h-10 rounded border bg-background px-3"
+                  {...register("type")}
+                >
+                  <option value="DAMAGED">Damaged</option>
+                  <option value="EXPIRED">Expired</option>
+                  <option value="ADJUSTMENT">Count correction</option>
+                </select>
+              </label>
+            )}
             <Label>Quantity</Label>
             <Input type="number" min="1" {...register("quantity")} />
             {errors.quantity && (
@@ -161,8 +190,11 @@ const onSubmit = (values: StockMovementValues) => {
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Notes (Optional)</Label>
+            <Label>Reason</Label>
             <Textarea rows={3} {...register("notes")} />
+            {errors.notes && (
+              <p className="text-xs text-destructive">{errors.notes.message}</p>
+            )}
           </div>
         </div>
       </FormSection>
