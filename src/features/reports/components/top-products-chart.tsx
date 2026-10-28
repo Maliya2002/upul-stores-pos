@@ -16,13 +16,17 @@ export function TopProductsChart({ data }: TopProductsChartProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-bold">
-          Top Selling Products
+          Gross Product Sales
         </CardTitle>
         <Badge variant="secondary" className="text-xs">
           All Time
         </Badge>
       </CardHeader>
       <CardContent>
+        <p className="mb-3 text-xs text-muted-foreground">
+          All-time line sales before invoice discounts and returns; excludes
+          cancelled and pending orders.
+        </p>
         {data.length === 0 ? (
           <div className="py-10 text-center text-muted-foreground text-sm">
             No sales data yet

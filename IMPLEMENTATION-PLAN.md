@@ -19,6 +19,10 @@ Work in this order. A feature is complete only after its business rules and fail
 - Browser acceptance remains pending while local browser use is disabled. Verify narrow-screen controls, Apply, Reset and pagination after enabling browser access.
 - Verified: four focused unit tests, PostgreSQL shift integration test including exact midnight boundaries, targeted ESLint and production build.
 
-## Next confirmed reporting defects
+## Reporting delivery
 
-`src/features/reports/actions/report-actions.ts` currently computes monthly profit as revenue minus expenses, without cost of goods sold. Sales aggregates do not deduct refunds, and reporting date boundaries depend on the host timezone. Correct these together with regression fixtures for partial returns, discounts, historical costs and Colombo midnight boundaries before treating profit as reliable.
+Reports now use Colombo transaction periods: sales on invoice date, returns on return date, and expenses on paid date. Completed and refunded sales remain in the original sale period; cancelled/pending orders are excluded. Net receipts include tax and invoice discounts. Estimated profit removes allocated tax using saved line tax rates, historical unit cost and recorded expenses. Only restocked returns reverse cost. Missing historical costs, line allocations or amount-only return details suppress profit instead of substituting today's prices.
+
+Top products is explicitly a gross line-sales ranking before invoice discounts/returns, not a net-product profitability report. A full net-product report remains future work. Expense completeness, tax-allocation assumptions and inventory valuation policy need operator review before financial sign-off. The period reader loads matching lines; large-volume performance testing remains pending.
+
+Verified with pure arithmetic/date tests and PostgreSQL integration fixtures for cross-period refunds, paid dates, saved costs, cancelled-order exclusion and staff permissions. Fixtures roll back without changing shop records.

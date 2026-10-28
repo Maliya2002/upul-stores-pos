@@ -78,7 +78,7 @@ This is a development build, not a declaration that every module is production-r
 - Email/WhatsApp notification settings remain a placeholder.
 - Payment gateway processing, gift cards, split payments and variant-level POS sales are not integrated.
 - Employee attendance/payroll/leave screens need an operational workflow review.
-- Historical profit/report accounting needs further work: the Reports module still requires cost/refund reconciliation. Sales and Dashboard display invoice totals net of refunds; new cost snapshots support the next reporting phase.
+- Reports now show transaction-period net receipts and estimated profit using saved item costs, allocated tax, refunds and expenses paid in the period. Legacy records without sufficient historical details show unavailable profit. Validate expense completeness, tax allocation and inventory valuation with the shop operator before financial sign-off; see IMPLEMENTATION-PLAN.md.
 - Multi-terminal/offline reconciliation, cash-drawer shifts, end-of-day closing and recovery across cleared browser sessions require further work.
 - Replace demo credentials/data, verify all role-specific workflows, and rerun the dependency audit before deployment.
 - Use PostgreSQL `pg_dump` and a tested restore procedure for real backups; the UI export excludes passwords and some related tables.

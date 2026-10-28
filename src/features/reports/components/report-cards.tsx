@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  DollarSign,
-  ShoppingCart,
-  TrendingUp,
-  Wallet,
-  Package,
-  Users,
-  AlertTriangle,
-  Calendar,
-} from "lucide-react";
+import { DollarSign, TrendingUp, Wallet, AlertTriangle } from "lucide-react";
 import { GradientCard } from "@/components/shared/gradient-card";
 import { NumberTicker } from "@/components/animations/number-ticker";
 
@@ -17,7 +8,7 @@ interface ReportCardsProps {
   todayRevenue: number;
   todayOrders: number;
   monthRevenue: number;
-  monthProfit: number;
+  monthProfit: number | null;
   monthExpenses: number;
   totalProducts: number;
   totalCustomers: number;
@@ -37,7 +28,7 @@ export function ReportCards({
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <GradientCard
-        title="Today's Revenue"
+        title="Today's Net Receipts"
         value={<NumberTicker value={todayRevenue} prefix="Rs. " />}
         subtitle={`${todayOrders} orders today`}
         icon={DollarSign}
@@ -46,7 +37,7 @@ export function ReportCards({
         delay={0}
       />
       <GradientCard
-        title="Monthly Revenue"
+        title="Monthly Net Receipts"
         value={<NumberTicker value={monthRevenue} prefix="Rs. " />}
         icon={TrendingUp}
         gradient="bg-blue-500/10"
@@ -54,18 +45,28 @@ export function ReportCards({
         delay={0.1}
       />
       <GradientCard
-        title="Monthly Profit"
+        title="Estimated Monthly Profit"
         value={
-          <NumberTicker
-            value={monthProfit}
-            prefix="Rs. "
-            className={monthProfit >= 0 ? "text-emerald-500" : "text-red-500"}
-          />
+          monthProfit === null ? (
+            <span>Unavailable</span>
+          ) : (
+            <NumberTicker
+              value={monthProfit}
+              prefix="Rs. "
+              className={
+                (monthProfit ?? 0) >= 0 ? "text-emerald-500" : "text-red-500"
+              }
+            />
+          )
         }
         subtitle={`Expenses: Rs.${monthExpenses.toLocaleString()}`}
         icon={Wallet}
-        gradient={monthProfit >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}
-        iconColor={monthProfit >= 0 ? "text-emerald-500" : "text-red-500"}
+        gradient={
+          (monthProfit ?? 0) >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"
+        }
+        iconColor={
+          (monthProfit ?? 0) >= 0 ? "text-emerald-500" : "text-red-500"
+        }
         delay={0.2}
       />
       <GradientCard
