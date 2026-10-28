@@ -232,6 +232,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
       "purchases add stock using canonical product names and reject duplicates",
       async () => {
         const data = {
+          requestKey: randomUUID(),
           supplierId: supplier.id,
           paymentMethod: "CASH",
           notes: prefix,
@@ -244,12 +245,18 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
             },
           ],
         };
-        const result = await createPurchaseAction(data);
+        const firstAttempts = await Promise.all([createPurchaseAction(data), createPurchaseAction(data)]);
+        const result = firstAttempts[0];
+        assert.ok(firstAttempts.every(r => r.success && r.purchaseId === result.purchaseId));
         assert.equal(result.success, true, result.error);
         const purchase = await prisma.purchase.findUniqueOrThrow({
           where: { id: result.purchaseId },
           include: { items: true },
         });
+        const replay = await Promise.all([createPurchaseAction(data), createPurchaseAction(data)]);
+        assert.ok(replay.every(r => r.success && r.purchaseId === purchase.id));
+        assert.equal((await createPurchaseAction({ ...data, notes: "changed" })).success, false);
+        assert.equal(await prisma.auditLog.count({ where: { entityId: purchase.id, action: "PURCHASE_RECEIVED" } }), 1);
         assert.equal(purchase.total, 120);
         assert.equal(purchase.items[0].name, product.name);
         assert.equal(
@@ -294,6 +301,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
         );
         await assert.rejects(
           createPurchaseAction({
+            requestKey: randomUUID(),
             supplierId: supplier.id,
             paymentMethod: "CASH",
             notes: "",

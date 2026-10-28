@@ -26,3 +26,11 @@ Reports now use Colombo transaction periods: sales on invoice date, returns on r
 Top products is explicitly a gross line-sales ranking before invoice discounts/returns, not a net-product profitability report. A full net-product report remains future work. Expense completeness, tax-allocation assumptions and inventory valuation policy need operator review before financial sign-off. The period reader loads matching lines; large-volume performance testing remains pending.
 
 Verified with pure arithmetic/date tests and PostgreSQL integration fixtures for cross-period refunds, paid dates, saved costs, cancelled-order exclusion and staff permissions. Fixtures roll back without changing shop records.
+
+## Purchase receiving delivery
+
+The existing fully received/fully paid purchase action now requires a UUID request reference. A unique database key and staff/payload fingerprint prevent repeated stock increments on retry; serializable retries re-read the receipt. Purchase, stock history, supplier order count and staff audit entry commit together. The form retains an unresolved request in session storage and restores it after reload. Clear browser storage/new tabs do not preserve that recovery context: inspect purchase history before re-entering an uncertain receipt.
+
+This form records cash-paid goods already received. Pending orders, partial receiving, supplier credit/payments and stock-adjustment replay protection remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
+
+Validation: 9 database integration checks, empty-database migration, targeted lint, TypeScript and Webpack production build passed. Default Turbopack build ran out of disk space; generated caches were removed. Browser acceptance remains pending. Free C: space remained approximately 220 MB after the build; more space is needed for reliable development.

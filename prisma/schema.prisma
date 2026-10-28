@@ -502,6 +502,8 @@ model Warehouse {
 // ─── Purchases ────────────────────────────────────────────────
 
 model Purchase {
+  requestKey String? @unique
+  requestHash String?
   id             String         @id @default(cuid())
   purchaseNumber String         @unique
   supplierId     String
