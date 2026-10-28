@@ -12,7 +12,7 @@ export default async function ReconciliationPage({ searchParams }: { searchParam
   const pageUrl = (page: number) => `/shifts/reconciliation?${new URLSearchParams({ status, cashierId, page: String(page) })}`;
   return <div className="space-y-6">
     <header className="space-y-2"><Link href="/shifts" className="text-sm underline">My cash shifts</Link><h1 className="text-2xl font-bold">Shift reconciliation</h1><p className="text-sm text-muted-foreground">Review all staff drawers. Closed shifts show the saved closing balance. Times are Asia/Colombo.</p></header>
-    <form className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+    <form key={`${status}:${cashierId}`} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
       <label className="flex min-w-0 flex-col gap-1">Status<select name="status" defaultValue={status} className="h-10 rounded border bg-background px-3"><option value="all">All shifts</option><option value="open">Open</option><option value="closed">Closed</option><option value="difference">Cash difference</option></select></label>
       <label className="flex min-w-0 max-w-full flex-col gap-1">Cashier<select name="cashierId" defaultValue={cashierId} className="h-10 max-w-full rounded border bg-background px-3"><option value="">All staff</option>{data.cashiers.map(c => <option key={c.id} value={c.id}>{c.name}{c.isActive ? "" : " (inactive)"}</option>)}</select></label>
       <button type="submit" className="h-10 rounded bg-primary px-4 text-primary-foreground">Apply filters</button><Link href="/shifts/reconciliation" className="p-2 underline">Reset</Link>
