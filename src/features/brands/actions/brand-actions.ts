@@ -1,11 +1,14 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 import { brandSchema, type BrandFormValues } from "../schemas/brand-schema";
 
 export async function getBrands() {
+  await requireStaff();
   return prisma.brand.findMany({
     include: { _count: { select: { products: true } } },
     orderBy: { name: "asc" },
@@ -13,6 +16,7 @@ export async function getBrands() {
 }
 
 export async function getBrandById(id: string) {
+  await requireStaff();
   return prisma.brand.findUnique({
     where: { id },
     include: { _count: { select: { products: true } } },
@@ -37,9 +41,13 @@ async function generateSlug(name: string, excludeId?: string) {
 }
 
 export async function createBrandAction(input: BrandFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = brandSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -68,9 +76,13 @@ export async function createBrandAction(input: BrandFormValues) {
 }
 
 export async function updateBrandAction(id: string, input: BrandFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = brandSchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -107,6 +119,7 @@ export async function updateBrandAction(id: string, input: BrandFormValues) {
 }
 
 export async function deleteBrandAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   try {
     const brand = await prisma.brand.findUnique({
       where: { id },

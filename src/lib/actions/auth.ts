@@ -1,11 +1,15 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import { randomBytes, randomInt } from "node:crypto";
+import { requireStaff } from "@/lib/authorization";
 import { signIn, signOut } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import {
   loginSchema,
   forgotPasswordSchema,
+  resetPasswordSchema,
+  registerSchema,
 } from "@/lib/validations/auth";
 import type {
   LoginFormData,
@@ -65,6 +69,13 @@ export async function logoutAction() {
 /* ── Forgot Password ─────────────────────── */
 
 export async function forgotPasswordAction(data: ForgotPasswordFormData) {
+  if (process.env.NODE_ENV !== "development") {
+    return {
+      success: false,
+      error:
+        "Email recovery is not configured. Contact your store administrator.",
+    };
+  }
   const validated = forgotPasswordSchema.safeParse(data);
 
   if (!validated.success) {
@@ -86,8 +97,7 @@ export async function forgotPasswordAction(data: ForgotPasswordFormData) {
       };
     }
 
-    const token =
-      Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const token = randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 1000 * 60 * 60);
 
     await prisma.passwordResetToken.deleteMany({
@@ -103,14 +113,14 @@ export async function forgotPasswordAction(data: ForgotPasswordFormData) {
     });
 
     console.log(
-      `[DEV] Reset link: http://localhost:3000/reset-password?token=${token}`
+      `[DEV] Reset link: http://localhost:3000/reset-password?token=${token}`,
     );
 
     return {
       success: true,
-      message: "Password reset link sent to your email.",
-      devToken:
-        process.env.NODE_ENV === "development" ? token : undefined,
+      message:
+        "Development reset token created. Email delivery is not configured.",
+      devToken: process.env.NODE_ENV === "development" ? token : undefined,
     };
   } catch {
     return {
@@ -122,10 +132,17 @@ export async function forgotPasswordAction(data: ForgotPasswordFormData) {
 
 /* ── Reset Password ─────────────────────── */
 
-export async function resetPasswordAction(
-  token: string,
-  newPassword: string
-) {
+export async function resetPasswordAction(token: string, newPassword: string) {
+  const validated = resetPasswordSchema.safeParse({
+    token,
+    password: newPassword,
+    confirmPassword: newPassword,
+  });
+  if (!validated.success)
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid password.",
+    };
   try {
     const resetToken = await prisma.passwordResetToken.findUnique({
       where: { token },
@@ -137,12 +154,17 @@ export async function resetPasswordAction(
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    await prisma.user.update({
-      where: { email: resetToken.email },
-      data: { password: hashedPassword },
+    await prisma.$transaction(async (tx) => {
+      const consumed = await tx.passwordResetToken.deleteMany({
+        where: { token, expires: { gt: new Date() } },
+      });
+      if (consumed.count !== 1)
+        throw new Error("Reset token already used or expired.");
+      await tx.user.update({
+        where: { email: resetToken.email },
+        data: { password: hashedPassword },
+      });
     });
-
-    await prisma.passwordResetToken.delete({ where: { token } });
 
     return { success: true, message: "Password reset successfully." };
   } catch {
@@ -156,6 +178,13 @@ export async function resetPasswordAction(
 /* ── Generate OTP ───────────────────────── */
 
 export async function generateOTPAction(email: string) {
+  if (process.env.NODE_ENV !== "development") {
+    return {
+      success: false,
+      error:
+        "Email verification is not configured. Contact your store administrator.",
+    };
+  }
   try {
     const user = await prisma.user.findUnique({ where: { email } });
 
@@ -163,7 +192,7 @@ export async function generateOTPAction(email: string) {
       return { success: false, error: "User not found." };
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = randomInt(100000, 1000000).toString();
     const expires = new Date(Date.now() + 1000 * 60 * 10);
 
     await prisma.oTPToken.deleteMany({ where: { email } });
@@ -173,9 +202,8 @@ export async function generateOTPAction(email: string) {
 
     return {
       success: true,
-      message: "OTP sent to your email.",
-      devOTP:
-        process.env.NODE_ENV === "development" ? otp : undefined,
+      message: "Development OTP created. Email delivery is not configured.",
+      devOTP: process.env.NODE_ENV === "development" ? otp : undefined,
     };
   } catch {
     return { success: false, error: "Failed to generate OTP." };
@@ -205,6 +233,12 @@ export async function verifyOTPAction(email: string, otp: string) {
 /* ── Create Default Admin ──────────────── */
 
 export async function createDefaultAdmin() {
+  if (process.env.NODE_ENV !== "development") {
+    return {
+      success: false,
+      error: "Use the local database seed to create an administrator.",
+    };
+  }
   try {
     const existing = await prisma.user.findUnique({
       where: { email: "admin@upulstores.lk" },
@@ -241,6 +275,18 @@ export async function registerAction(data: {
   phone?: string;
 }) {
   try {
+    await requireStaff(["OWNER", "ADMIN"]);
+    const validated = registerSchema.safeParse({
+      ...data,
+      email: data.email?.trim().toLowerCase(),
+      confirmPassword: data.password,
+    });
+    if (!validated.success)
+      return {
+        success: false,
+        error: validated.error.issues[0]?.message ?? "Invalid staff details.",
+      };
+    data = validated.data;
     const existing = await prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -250,7 +296,10 @@ export async function registerAction(data: {
     }
 
     if (data.password.length < 6) {
-      return { success: false, error: "Password must be at least 6 characters." };
+      return {
+        success: false,
+        error: "Password must be at least 6 characters.",
+      };
     }
 
     const hashed = await bcrypt.hash(data.password, 12);

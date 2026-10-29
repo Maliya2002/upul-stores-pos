@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Database, Shield } from "lucide-react";
 import { motion } from "framer-motion";
@@ -42,13 +42,14 @@ export function BackupRestore() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Database className="h-4 w-4 text-blue-500" />
-              Export Backup
+              Export Store Data
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Download a complete backup of your database including products,
-              customers, orders, settings and more.
+              Download a JSON export of products, customers, orders and
+              settings. This export is not a full database backup and cannot
+              restore staff passwords or all transaction history.
             </p>
             <Button
               onClick={handleBackup}
@@ -63,7 +64,7 @@ export function BackupRestore() {
               ) : (
                 <>
                   <Download className="mr-2 h-4 w-4" />
-                  Download Backup
+                  Download Data Export
                 </>
               )}
             </Button>
@@ -91,15 +92,15 @@ export function BackupRestore() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>Database: Connected</span>
+                <span>Use PostgreSQL pg_dump for a complete backup.</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>Encryption: Active</span>
+                <span>Keep backup files in a private, secure location.</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>Auto-save: Enabled</span>
+                <span>Test recovery before relying on a backup.</span>
               </div>
             </div>
           </CardContent>

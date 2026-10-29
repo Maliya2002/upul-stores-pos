@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { money } from "../utils/checkout";
 
 export interface CartItem {
   productId: string;
@@ -51,11 +52,11 @@ interface CartState {
 }
 
 function calcItemTotal(item: Omit<CartItem, "total">): number {
-  const base = item.price * item.quantity;
-  const discountAmt = (base * item.discount) / 100;
+  const base = money(item.price * item.quantity);
+  const discountAmt = money((base * item.discount) / 100);
   const afterDiscount = base - discountAmt;
-  const taxAmt = (afterDiscount * item.tax) / 100;
-  return afterDiscount + taxAmt;
+  const taxAmt = money((afterDiscount * item.tax) / 100);
+  return money(afterDiscount + taxAmt);
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -68,15 +69,20 @@ export const useCartStore = create<CartState>((set, get) => ({
   heldOrders: [],
 
   addItem: (item) => {
+    if (
+      !Number.isSafeInteger(item.quantity) ||
+      item.quantity <= 0 ||
+      item.maxStock <= 0
+    )
+      return;
+    set({ couponCode: "", couponDiscount: 0 });
     set((state) => {
-      const existing = state.items.find(
-        (i) => i.productId === item.productId
-      );
+      const existing = state.items.find((i) => i.productId === item.productId);
 
       if (existing) {
         const newQty = Math.min(
           existing.quantity + item.quantity,
-          item.maxStock
+          item.maxStock,
         );
         return {
           items: state.items.map((i) =>
@@ -86,14 +92,18 @@ export const useCartStore = create<CartState>((set, get) => ({
                   quantity: newQty,
                   total: calcItemTotal({ ...i, quantity: newQty }),
                 }
-              : i
+              : i,
           ),
         };
       }
 
       const newItem: CartItem = {
         ...item,
-        total: calcItemTotal(item),
+        quantity: Math.min(item.quantity, item.maxStock),
+        total: calcItemTotal({
+          ...item,
+          quantity: Math.min(item.quantity, item.maxStock),
+        }),
       };
 
       return { items: [...state.items, newItem] };
@@ -102,12 +112,17 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   removeItem: (productId) => {
     set((state) => ({
+      couponCode: "",
+      couponDiscount: 0,
       items: state.items.filter((i) => i.productId !== productId),
     }));
   },
 
   updateQuantity: (productId, quantity) => {
+    if (!Number.isSafeInteger(quantity)) return;
     set((state) => ({
+      couponCode: "",
+      couponDiscount: 0,
       items: state.items.map((i) =>
         i.productId === productId
           ? {
@@ -118,13 +133,16 @@ export const useCartStore = create<CartState>((set, get) => ({
                 quantity: Math.max(1, Math.min(quantity, i.maxStock)),
               }),
             }
-          : i
+          : i,
       ),
     }));
   },
 
   updateDiscount: (productId, discount) => {
+    if (!Number.isFinite(discount)) return;
     set((state) => ({
+      couponCode: "",
+      couponDiscount: 0,
       items: state.items.map((i) =>
         i.productId === productId
           ? {
@@ -135,7 +153,7 @@ export const useCartStore = create<CartState>((set, get) => ({
                 discount: Math.max(0, Math.min(discount, 100)),
               }),
             }
-          : i
+          : i,
       ),
     }));
   },
@@ -172,7 +190,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (state.items.length === 0) return;
 
     const held: HeldOrder = {
-      id: `HOLD-${Date.now()}`,
+      id: `HOLD-${crypto.randomUUID()}`,
       items: [...state.items],
       customerId: state.customerId,
       customerName: state.customerName,
@@ -195,9 +213,13 @@ export const useCartStore = create<CartState>((set, get) => ({
     const state = get();
     const order = state.heldOrders.find((o) => o.id === orderId);
     if (!order) return;
+    // Preserve the current cart rather than silently replacing it when resuming.
+    if (state.items.length > 0) get().holdOrder();
 
     set((s) => ({
       items: order.items,
+      couponCode: "",
+      couponDiscount: 0,
       customerId: order.customerId,
       customerName: order.customerName,
       note: order.note,
@@ -212,26 +234,35 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   getSubtotal: () => {
-    return get().items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
+    return money(
+      get().items.reduce(
+        (sum, item) => sum + money(item.price * item.quantity),
+        0,
+      ),
     );
   },
 
   getTaxTotal: () => {
-    return get().items.reduce((sum, item) => {
-      const base = item.price * item.quantity;
-      const disc = (base * item.discount) / 100;
-      return sum + ((base - disc) * item.tax) / 100;
-    }, 0);
+    return money(
+      get().items.reduce((sum, item) => {
+        const base = money(item.price * item.quantity);
+        const disc = money((base * item.discount) / 100);
+        return sum + money(((base - disc) * item.tax) / 100);
+      }, 0),
+    );
   },
 
   getDiscountTotal: () => {
     const state = get();
     const itemDisc = state.items.reduce((sum, item) => {
-      return sum + (item.price * item.quantity * item.discount) / 100;
+      return (
+        sum + money((money(item.price * item.quantity) * item.discount) / 100)
+      );
     }, 0);
-    return itemDisc + state.couponDiscount;
+    return money(
+      itemDisc +
+        Math.min(state.couponDiscount, money(state.getSubtotal() - itemDisc)),
+    );
   },
 
   getGrandTotal: () => {
@@ -239,7 +270,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     const subtotal = state.getSubtotal();
     const tax = state.getTaxTotal();
     const discount = state.getDiscountTotal();
-    return Math.max(0, subtotal + tax - discount);
+    return money(Math.max(0, subtotal + tax - discount));
   },
 
   getItemCount: () => {

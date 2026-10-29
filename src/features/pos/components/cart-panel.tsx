@@ -1,12 +1,9 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { AnimatePresence } from "framer-motion";
-import {
-  ShoppingCart,
-  CreditCard,
-  Trash2,
-  Receipt,
-} from "lucide-react";
+import { ShoppingCart, CreditCard, Trash2, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -14,6 +11,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "../store/cart-store";
 import { CartItemCard } from "./cart-item";
 import { CustomerSelect } from "./customer-select";
+import { Input } from "@/components/ui/input";
+import { applyCouponAction } from "../actions/pos-actions";
 
 interface CartPanelProps {
   customers: {
@@ -29,7 +28,11 @@ export function CartPanel({ customers, onCheckout }: CartPanelProps) {
   const items = useCartStore((s) => s.items);
   const customerId = useCartStore((s) => s.customerId);
   const customerName = useCartStore((s) => s.customerName);
-  const couponDiscount = useCartStore((s) => s.couponDiscount);
+  const couponCode = useCartStore((s) => s.couponCode);
+  const setCoupon = useCartStore((s) => s.setCoupon);
+  const clearCoupon = useCartStore((s) => s.clearCoupon);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponPending, startCoupon] = useTransition();
   const setCustomer = useCartStore((s) => s.setCustomer);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
@@ -45,7 +48,7 @@ export function CartPanel({ customers, onCheckout }: CartPanelProps) {
   const grandTotal = getGrandTotal();
 
   return (
-    <div className="flex h-full flex-col border-l bg-card">
+    <div className="flex h-full w-full min-h-0 flex-col border-l bg-card">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -106,6 +109,51 @@ export function CartPanel({ customers, onCheckout }: CartPanelProps) {
       {/* Totals */}
       {items.length > 0 && (
         <div className="border-t px-4 py-4 space-y-3">
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const cartSnapshot = useCartStore.getState().items;
+              startCoupon(async () => {
+                const result = await applyCouponAction(couponInput, subtotal);
+                if (useCartStore.getState().items !== cartSnapshot) {
+                  toast.error("Cart changed. Apply the coupon again.");
+                  return;
+                }
+                if (!result.success) {
+                  toast.error(result.error);
+                  return;
+                }
+                setCoupon(
+                  couponInput.trim().toUpperCase(),
+                  result.discount ?? 0,
+                );
+                toast.success(result.message);
+              });
+            }}
+          >
+            <Input
+              aria-label="Coupon code"
+              placeholder="Coupon code"
+              value={couponInput}
+              onChange={(event) => setCouponInput(event.target.value)}
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={couponPending || !couponInput.trim()}
+            >
+              Apply
+            </Button>
+          </form>
+          {couponCode && (
+            <div className="flex items-center justify-between text-sm">
+              <span>Coupon: {couponCode}</span>
+              <Button size="sm" variant="ghost" onClick={clearCoupon}>
+                Remove
+              </Button>
+            </div>
+          )}
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>

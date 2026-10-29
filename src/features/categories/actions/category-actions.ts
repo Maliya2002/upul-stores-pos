@@ -1,5 +1,7 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
@@ -9,6 +11,7 @@ import {
 } from "../schemas/category-schema";
 
 export async function getCategories() {
+  await requireStaff();
   return prisma.category.findMany({
     include: {
       parent: true,
@@ -19,6 +22,7 @@ export async function getCategories() {
 }
 
 export async function getCategoryById(id: string) {
+  await requireStaff();
   return prisma.category.findUnique({
     where: { id },
     include: {
@@ -30,6 +34,7 @@ export async function getCategoryById(id: string) {
 }
 
 export async function getParentCategories() {
+  await requireStaff();
   return prisma.category.findMany({
     where: { parentId: null, isActive: true },
     orderBy: { name: "asc" },
@@ -55,9 +60,13 @@ async function generateSlug(name: string, excludeId?: string) {
 }
 
 export async function createCategoryAction(input: CategoryFormValues) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = categorySchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -86,10 +95,17 @@ export async function createCategoryAction(input: CategoryFormValues) {
   }
 }
 
-export async function updateCategoryAction(id: string, input: CategoryFormValues) {
+export async function updateCategoryAction(
+  id: string,
+  input: CategoryFormValues,
+) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const validated = categorySchema.safeParse(input);
   if (!validated.success) {
-    return { success: false, error: validated.error.issues[0]?.message ?? "Invalid data" };
+    return {
+      success: false,
+      error: validated.error.issues[0]?.message ?? "Invalid data",
+    };
   }
 
   const data = validated.data;
@@ -127,6 +143,7 @@ export async function updateCategoryAction(id: string, input: CategoryFormValues
 }
 
 export async function deleteCategoryAction(id: string) {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   try {
     const category = await prisma.category.findUnique({
       where: { id },
@@ -138,7 +155,10 @@ export async function deleteCategoryAction(id: string) {
       return { success: false, error: "Cannot delete: category has products." };
     }
     if (category._count.children > 0) {
-      return { success: false, error: "Cannot delete: category has sub-categories." };
+      return {
+        success: false,
+        error: "Cannot delete: category has sub-categories.",
+      };
     }
 
     await prisma.category.delete({ where: { id } });

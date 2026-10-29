@@ -25,7 +25,7 @@ export function SalesChart({ data }: SalesChartProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base font-bold">
-          Revenue vs Expenses
+          Net Receipts vs Expenses
         </CardTitle>
         <Badge variant="secondary" className="text-xs">
           Last 6 Months
@@ -45,21 +45,21 @@ export function SalesChart({ data }: SalesChartProps) {
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip
-  contentStyle={{
-    borderRadius: "12px",
-    border: "1px solid hsl(var(--border))",
-    background: "hsl(var(--card))",
-  }}
-  formatter={(value) => [
-    `Rs. ${Number(value ?? 0).toLocaleString()}`,
-    "",
-  ]}
-/>
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "1px solid hsl(var(--border))",
+                    background: "hsl(var(--card))",
+                  }}
+                  formatter={(value) => [
+                    `Rs. ${Number(value ?? 0).toLocaleString()}`,
+                    "",
+                  ]}
+                />
                 <Legend />
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  name="Revenue"
+                  name="Net receipts (incl. tax)"
                   stroke="#3b82f6"
                   fill="#3b82f6"
                   fillOpacity={0.1}

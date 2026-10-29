@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  DollarSign,
-  ShoppingCart,
-  TrendingUp,
-  RotateCcw,
-} from "lucide-react";
+import { DollarSign, ShoppingCart, TrendingUp, RotateCcw } from "lucide-react";
 import { GradientCard } from "@/components/shared/gradient-card";
 import { NumberTicker } from "@/components/animations/number-ticker";
 
@@ -25,8 +20,8 @@ export function SalesStats({
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <GradientCard
-        title="Today's Revenue"
-        value={<NumberTicker value={todayRevenue} prefix="Rs. " />}
+        title="Today's Net Sales"
+        value={<NumberTicker value={todayRevenue} prefix="Rs. " decimals={2} />}
         icon={DollarSign}
         gradient="bg-emerald-500/10"
         iconColor="text-emerald-500"
@@ -43,8 +38,8 @@ export function SalesStats({
       />
 
       <GradientCard
-        title="Monthly Revenue"
-        value={<NumberTicker value={monthRevenue} prefix="Rs. " />}
+        title="Monthly Net Sales"
+        value={<NumberTicker value={monthRevenue} prefix="Rs. " decimals={2} />}
         icon={TrendingUp}
         gradient="bg-purple-500/10"
         iconColor="text-purple-500"
@@ -56,6 +51,7 @@ export function SalesStats({
         value={
           <NumberTicker
             value={totalRefundAmount}
+            decimals={2}
             prefix="Rs. "
             className="text-red-500"
           />

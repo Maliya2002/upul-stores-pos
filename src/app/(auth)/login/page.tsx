@@ -6,7 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Loader2, ShoppingBag, Lock, Mail, Sparkles } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  ShoppingBag,
+  Lock,
+  Mail,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { signIn } from "next-auth/react";
 
@@ -72,7 +80,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left — Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-linear-to-br from-blue-600 via-indigo-700 to-purple-800 flex-col items-center justify-center p-12 text-white">
-        <ParticlesBg particleCount={40} particleColor="rgba(255,255,255,0.15)" />
+        <ParticlesBg
+          particleCount={40}
+          particleColor="rgba(255,255,255,0.15)"
+        />
 
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -95,7 +106,8 @@ export default function LoginPage() {
             Smart POS Enterprise
           </p>
           <p className="text-blue-200/80 text-sm max-w-md mx-auto leading-relaxed">
-            The most powerful retail management solution for modern Sri Lankan businesses
+            The most powerful retail management solution for modern Sri Lankan
+            businesses
           </p>
 
           <motion.div
@@ -194,7 +206,9 @@ export default function LoginPage() {
                 />
               </div>
               {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.email.message}
+                </p>
               )}
             </motion.div>
 
@@ -284,62 +298,59 @@ export default function LoginPage() {
               </Button>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card className="border-dashed border-primary/20 bg-primary/2">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-xs font-bold text-primary">
-                      Demo Credentials
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-center mb-3">
-                    <div className="rounded-xl bg-muted/60 p-2.5">
-                      <p className="font-bold text-foreground">Email</p>
-                      <p className="text-muted-foreground mt-0.5">
-                        admin@upulstores.lk
+            {process.env.NODE_ENV === "development" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                <Card className="border-dashed border-primary/20 bg-primary/2">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <p className="text-xs font-bold text-primary">
+                        Demo Credentials
                       </p>
                     </div>
-                    <div className="rounded-xl bg-muted/60 p-2.5">
-                      <p className="font-bold text-foreground">Password</p>
-                      <p className="text-muted-foreground mt-0.5">
-                        Admin@123
-                      </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-center mb-3">
+                      <div className="rounded-xl bg-muted/60 p-2.5">
+                        <p className="font-bold text-foreground">Email</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          admin@upulstores.lk
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-muted/60 p-2.5">
+                        <p className="font-bold text-foreground">Password</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          Admin@123
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs rounded-lg"
-                    onClick={fillDemo}
-                  >
-                    ✨ Fill Demo Credentials
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs rounded-lg"
+                      onClick={fillDemo}
+                    >
+                      ✨ Fill Demo Credentials
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
           </form>
-<p className="mt-8 text-center text-xs text-muted-foreground">
-
-</p>
-<motion.p
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  transition={{ delay: 0.7 }}
-  className="mt-6 text-center text-sm text-muted-foreground"
->
-  Don&apos;t have an account?{" "}
-  <Link href="/register" className="font-semibold text-primary hover:underline">
-    Create Account
-  </Link>
-</motion.p>
+          <p className="mt-8 text-center text-xs text-muted-foreground"></p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="mt-6 text-center text-sm text-muted-foreground"
+          >
+            Need a staff account? Contact your store owner.
+          </motion.p>
           <p className="mt-8 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Upul Stores. All rights reserved.
+            © {new Date().getFullYear()} Upul Stores. All rights reserved.
           </p>
         </motion.div>
       </div>

@@ -1,9 +1,12 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import prisma from "@/lib/prisma";
 import type { ProductData, CustomerData } from "../utils/ai-algorithms";
 
 export async function getAIProductData(): Promise<ProductData[]> {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const products = await prisma.product.findMany({
     where: { isActive: true },
     include: {
@@ -17,7 +20,7 @@ export async function getAIProductData(): Promise<ProductData[]> {
   return products.map((p) => {
     const totalSold = p.orderItems.reduce(
       (sum: number, item: { quantity: number }) => sum + item.quantity,
-      0
+      0,
     );
 
     return {
@@ -31,7 +34,7 @@ export async function getAIProductData(): Promise<ProductData[]> {
       totalSold,
       totalRevenue: totalSold * p.sellingPrice,
       lastSoldDays: Math.floor(
-        (now.getTime() - p.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - p.updatedAt.getTime()) / (1000 * 60 * 60 * 24),
       ),
       category: p.category.name,
     };
@@ -39,6 +42,7 @@ export async function getAIProductData(): Promise<ProductData[]> {
 }
 
 export async function getAICustomerData(): Promise<CustomerData[]> {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const customers = await prisma.customer.findMany({
     where: { isActive: true },
     include: {
@@ -56,7 +60,7 @@ export async function getAICustomerData(): Promise<CustomerData[]> {
     const lastOrder = c.orders[0]?.createdAt;
     const lastOrderDays = lastOrder
       ? Math.floor(
-          (now.getTime() - lastOrder.getTime()) / (1000 * 60 * 60 * 24)
+          (now.getTime() - lastOrder.getTime()) / (1000 * 60 * 60 * 24),
         )
       : 999;
 
@@ -73,13 +77,21 @@ export async function getAICustomerData(): Promise<CustomerData[]> {
 }
 
 export async function getAIMonthlySales() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const months: { revenue: number; orders: number }[] = [];
 
   for (let i = 5; i >= 0; i--) {
     const date = new Date();
     date.setMonth(date.getMonth() - i);
     const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+    const end = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
 
     const sales = await prisma.order.aggregate({
       _sum: { total: true },

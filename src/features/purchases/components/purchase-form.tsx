@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -34,22 +34,42 @@ interface PurchaseFormProps {
 
 export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
   const router = useRouter();
+  const busy = useRef(false);
+  const storageKey = "pending-purchase-v1";
   const [isPending, startTransition] = useTransition();
   const [supplierId, setSupplierId] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        const pending = JSON.parse(saved);
+        setSupplierId(pending.supplierId);
+        setPaidAmount(
+          pending.paidAmount === undefined ? "" : String(pending.paidAmount),
+        );
+        setNotes(pending.notes);
+        setItems(pending.items);
+        toast.info("Pending purchase restored. Retry to confirm its outcome.");
+      }
+    } catch {
+      toast.error(
+        "Could not restore the pending purchase. Check purchase history before submitting.",
+      );
+    }
+  }, []);
+
   const addItem = () => {
-    setItems([
-      ...items,
-      { productId: "", name: "", quantity: 1, unitCost: 0 },
-    ]);
+    setItems([...items, { productId: "", name: "", quantity: 1, unitCost: 0 }]);
   };
 
   const updateItem = (
     index: number,
     field: keyof PurchaseItem,
-    value: string | number
+    value: string | number,
   ) => {
     const newItems = [...items];
 
@@ -73,7 +93,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
         ...newItems[index],
         unitCost: Number(value) || 0,
       };
-       } else if (field === "name") {
+    } else if (field === "name") {
       newItems[index] = {
         ...newItems[index],
         name: String(value),
@@ -89,7 +109,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
 
   const total = items.reduce(
     (sum, item) => sum + item.unitCost * item.quantity,
-    0
+    0,
   );
 
   const handleSubmit = () => {
@@ -108,32 +128,76 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
       return;
     }
 
+    if (busy.current) return;
+    busy.current = true;
     startTransition(async () => {
-      const result = await createPurchaseAction({
-        supplierId,
-        paymentMethod: "CASH",
-        notes,
-        items: items.map((item) => ({
-          productId: item.productId,
-          name: item.name,
-          quantity: item.quantity,
-          unitCost: item.unitCost,
-        })),
-      });
-
-      if (!result.success) {
-        toast.error(result.error || "Failed.");
-        return;
+      try {
+        const payload = {
+          ...(paidAmount !== "" ? { paidAmount: Number(paidAmount) } : {}),
+          supplierId,
+          paymentMethod: "CASH" as const,
+          notes,
+          items,
+        };
+        const saved = sessionStorage.getItem(storageKey);
+        const pending = saved
+          ? JSON.parse(saved)
+          : { ...payload, requestKey: crypto.randomUUID() };
+        if (
+          saved &&
+          JSON.stringify({
+            ...(pending.paidAmount !== undefined
+              ? { paidAmount: pending.paidAmount }
+              : {}),
+            supplierId: pending.supplierId,
+            paymentMethod: pending.paymentMethod,
+            notes: pending.notes,
+            items: pending.items,
+          }) !== JSON.stringify(payload)
+        ) {
+          toast.error(
+            "A purchase is awaiting confirmation. Reload to restore it, then retry before changing its details.",
+          );
+          return;
+        }
+        sessionStorage.setItem(storageKey, JSON.stringify(pending));
+        const result = await createPurchaseAction(pending);
+        if (!result.success) {
+          if (!result.retryable) sessionStorage.removeItem(storageKey);
+          toast.error(result.error || "Failed.");
+          return;
+        }
+        sessionStorage.removeItem(storageKey);
+        toast.success(result.message || "Purchase recorded.");
+        router.push("/purchases");
+        router.refresh();
+      } catch {
+        toast.error(
+          "Outcome unconfirmed. Keep this request and retry; check purchase history before starting another.",
+        );
+      } finally {
+        busy.current = false;
       }
-
-      toast.success(result.message || "Purchase created.");
-      router.push("/purchases");
-      router.refresh();
     });
   };
 
   return (
     <div className="space-y-6">
+      <p className="rounded-lg border p-4 text-sm">
+        Record goods already received. Enter cash paid now, or zero for supplier
+        credit. Stock increases immediately; the unpaid amount becomes supplier
+        debt.
+      </p>
+      <label className="flex flex-col gap-2">
+        Cash paid now (leave blank for full payment)
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={paidAmount}
+          onChange={(e) => setPaidAmount(e.target.value)}
+        />
+      </label>
       <FormSection title="Purchase Details">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -183,7 +247,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
                     updateItem(
                       index,
                       "productId",
-                      v === "none" ? "" : (v ?? "")
+                      v === "none" ? "" : (v ?? ""),
                     )
                   }
                 >
@@ -260,7 +324,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
               Creating...
             </>
           ) : (
-            "Create Purchase Order"
+            "Record Received Purchase"
           )}
         </Button>
       </div>

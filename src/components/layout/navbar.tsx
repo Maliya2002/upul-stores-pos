@@ -74,12 +74,13 @@ export function Navbar({ onMenuClick }: NavbarProps) {
         variant="ghost"
         size="icon"
         className="lg:hidden h-9 w-9 shrink-0"
+        aria-label="Open navigation"
         onClick={onMenuClick}
       >
         <Menu className="h-5 w-5" />
       </Button>
 
-      <div className="hidden sm:flex flex-col">
+      <div className="hidden sm:flex min-w-0 flex-col">
         <p className="text-sm font-semibold leading-tight">
           {getGreeting()},{" "}
           <span className="bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -92,7 +93,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
         </p>
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <SearchCommand />
 
         <Button
@@ -135,7 +136,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
               />
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-1rem)]">
             <div className="flex items-center justify-between px-4 py-3">
               <span className="font-semibold text-sm">Notifications</span>
               <Badge variant="secondary" className="text-xs font-medium">

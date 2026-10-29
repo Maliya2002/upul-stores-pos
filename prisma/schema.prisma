@@ -127,6 +127,8 @@ model User {
   salaries    Salary[]
   leaves      Leave[]
   auditLogs   AuditLog[]
+  refunds     Refund[]
+  cashShifts  CashShift[]
 
   @@map("users")
 }
@@ -313,6 +315,10 @@ model Supplier {
 }
 
 model SupplierPayment {
+  requestKey String? @unique
+  requestHash String?
+  purchaseId String?
+  purchase Purchase? @relation(fields: [purchaseId], references: [id])
   id          String        @id @default(cuid())
   supplierId  String
   amount      Float
@@ -354,7 +360,12 @@ model Customer {
 // ─── Orders & POS ─────────────────────────────────────────────
 
 model Order {
+  @@index([shiftId])
+  shiftId       String?
+  shift         CashShift? @relation(fields: [shiftId], references: [id])
   id            String        @id @default(cuid())
+  checkoutKey   String?       @unique
+  requestHash   String?
   orderNumber   String        @unique
   customerId    String?
   cashierId     String
@@ -396,6 +407,9 @@ model OrderItem {
   discount   Float   @default(0)
   tax        Float   @default(0)
   total      Float
+  netTotal   Float?
+  unitCost   Float?
+  refundItems RefundItem[]
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -420,22 +434,48 @@ model OrderPayment {
 }
 
 model Refund {
+  @@index([shiftId])
+  shiftId String?
+  shift CashShift? @relation(fields: [shiftId], references: [id])
   id        String   @id @default(cuid())
   orderId   String
   amount    Float
   reason    String?
   notes     String?
   createdAt DateTime @default(now())
+  requestKey String? @unique
+  requestHash String?
+  processedById String?
+  method PaymentMethod?
 
   order Order @relation(fields: [orderId], references: [id])
+  processedBy User? @relation(fields: [processedById], references: [id])
+  items RefundItem[]
 
   @@index([orderId])
   @@map("refunds")
 }
 
+model RefundItem {
+  id String @id @default(cuid())
+  refundId String
+  orderItemId String
+  quantity Int
+  restock Boolean
+  amount Float
+  refund Refund @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+
+  @@unique([refundId, orderItemId])
+  @@index([orderItemId])
+  @@map("refund_items")
+}
+
 // ─── Inventory ────────────────────────────────────────────────
 
 model StockMovement {
+  requestKey String? @unique
+  requestHash String?
   id          String            @id @default(cuid())
   productId   String
   type        StockMovementType
@@ -468,6 +508,9 @@ model Warehouse {
 // ─── Purchases ────────────────────────────────────────────────
 
 model Purchase {
+  payments SupplierPayment[]
+  requestKey String? @unique
+  requestHash String?
   id             String         @id @default(cuid())
   purchaseNumber String         @unique
   supplierId     String
@@ -655,4 +698,38 @@ model Coupon {
   updatedAt     DateTime  @updatedAt
 
   @@map("coupons")
+}
+
+model CashShift {
+  id String @id @default(cuid())
+  cashierId String
+  activeCashierId String? @unique
+  requestKey String @unique
+  openingCash Float
+  openedAt DateTime @default(now())
+  closedAt DateTime?
+  countedCash Float?
+  expectedCash Float?
+  variance Float?
+  closeNote String?
+  revision Int @default(0)
+  cashier User @relation(fields: [cashierId], references: [id])
+  orders Order[]
+  refunds Refund[]
+  movements CashMovement[]
+  @@index([cashierId, openedAt])
+  @@map("cash_shifts")
+}
+
+model CashMovement {
+  id String @id @default(cuid())
+  shiftId String
+  requestKey String @unique
+  direction String
+  amount Float
+  reason String
+  createdAt DateTime @default(now())
+  shift CashShift @relation(fields: [shiftId], references: [id])
+  @@index([shiftId])
+  @@map("cash_movements")
 }

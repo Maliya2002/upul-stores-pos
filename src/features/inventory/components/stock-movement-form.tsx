@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +44,7 @@ export function StockMovementForm({
   products,
 }: StockMovementFormProps) {
   const router = useRouter();
+  const busy = useRef(false);
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -51,40 +52,88 @@ export function StockMovementForm({
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<StockMovementInput, unknown, StockMovementValues>({
     resolver: zodResolver(stockMovementSchema),
-  defaultValues: {
-  productId: "",
-  type: defaultType as StockMovementValues["type"],
-  quantity: 1,
-  reference: "",
-  notes: "",
-},
+    defaultValues: {
+      productId: "",
+      type: defaultType as StockMovementValues["type"],
+      quantity: 1,
+      reference: "",
+      notes: "",
+    },
   });
+
+  const storageKey = `pending-stock-${mode}-v1`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        reset(JSON.parse(saved).values);
+        toast.info(
+          "Pending stock adjustment restored. Submit to confirm the same request.",
+        );
+      }
+    } catch {
+      toast.error(
+        "Could not restore adjustment. Check movement history before proceeding.",
+      );
+    }
+  }, [reset, storageKey]);
 
   const selectedProductId = (watch("productId") ?? "") as string;
   const selectedProduct = selectedProductId
     ? products.find((p) => p.id === selectedProductId)
     : null;
 
-const onSubmit = (values: StockMovementValues) => {
-  startTransition(async () => {
-    const action = mode === "in" ? stockInAction : stockOutAction;
-    const result = await action(values);
+  const onSubmit = (values: StockMovementValues) => {
+    if (busy.current) return;
+    busy.current = true;
+    startTransition(async () => {
+      try {
+        const action = mode === "in" ? stockInAction : stockOutAction;
+        const saved = sessionStorage.getItem(storageKey);
+        const pending = saved
+          ? JSON.parse(saved)
+          : { key: crypto.randomUUID(), values };
+        if (
+          saved &&
+          JSON.stringify(stockMovementSchema.parse(pending.values)) !==
+            JSON.stringify(values)
+        ) {
+          toast.error(
+            "An adjustment is awaiting confirmation. Reload to restore it and confirm it before making changes.",
+          );
+          return;
+        }
+        sessionStorage.setItem(storageKey, JSON.stringify(pending));
+        const result = await action(values, pending.key);
 
-    if (!result.success) {
-      toast.error(result.error || "Failed.");
-      return;
-    }
+        if (!result.success) {
+          if (!result.retryable) sessionStorage.removeItem(storageKey);
+          toast.error(result.error || "Failed.");
+          return;
+        }
 
-    toast.success(result.message || "Stock updated.");
-    router.push("/inventory");
-    router.refresh();
-  });
-};
+        sessionStorage.removeItem(storageKey);
+        toast.success(result.message || "Stock updated.");
+        router.push("/inventory");
+        router.refresh();
+      } catch {
+        toast.error("Outcome unconfirmed. Retry this same adjustment.");
+      } finally {
+        busy.current = false;
+      }
+    });
+  };
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <p className="rounded-lg border p-4 text-sm">
+        Manual stock correction only. Record purchases and customer returns in
+        their respective workflows. Pending adjustments are restored after
+        reload in this tab. Retry the same adjustment to confirm its outcome.
+      </p>
       <FormSection
         title={mode === "in" ? "Stock In Details" : "Stock Out Details"}
         description={
@@ -143,6 +192,19 @@ const onSubmit = (values: StockMovementValues) => {
           )}
 
           <div className="space-y-2">
+            {mode === "out" && (
+              <label className="flex flex-col gap-1 mb-3">
+                Reason category
+                <select
+                  className="h-10 rounded border bg-background px-3"
+                  {...register("type")}
+                >
+                  <option value="DAMAGED">Damaged</option>
+                  <option value="EXPIRED">Expired</option>
+                  <option value="ADJUSTMENT">Count correction</option>
+                </select>
+              </label>
+            )}
             <Label>Quantity</Label>
             <Input type="number" min="1" {...register("quantity")} />
             {errors.quantity && (
@@ -161,8 +223,11 @@ const onSubmit = (values: StockMovementValues) => {
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Notes (Optional)</Label>
+            <Label>Reason</Label>
             <Textarea rows={3} {...register("notes")} />
+            {errors.notes && (
+              <p className="text-xs text-destructive">{errors.notes.message}</p>
+            )}
           </div>
         </div>
       </FormSection>

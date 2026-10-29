@@ -13,7 +13,7 @@ export default async function StockInPage() {
       />
       <StockMovementForm
         mode="in"
-        defaultType="PURCHASE"
+        defaultType="ADJUSTMENT"
         products={products}
       />
     </div>

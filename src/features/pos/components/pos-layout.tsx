@@ -11,6 +11,7 @@ import { ProductGrid, type POSProduct } from "./product-grid";
 import { CartPanel } from "./cart-panel";
 import { PaymentModal } from "./payment-modal";
 import { HeldOrders } from "./held-orders";
+import { Button } from "@/components/ui/button";
 
 interface POSLayoutProps {
   products: POSProduct[];
@@ -23,14 +24,11 @@ interface POSLayoutProps {
   cashierId: string;
 }
 
-export function POSLayout({
-  products,
-  customers,
-  cashierId,
-}: POSLayoutProps) {
+export function POSLayout({ products, customers, cashierId }: POSLayoutProps) {
   const [search, setSearch] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [heldOpen, setHeldOpen] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   const addItem = useCartStore((s) => s.addItem);
   const holdOrder = useCartStore((s) => s.holdOrder);
@@ -40,11 +38,12 @@ export function POSLayout({
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(search))
+      (p.barcode && p.barcode.includes(search)),
   );
 
   const handleAddToCart = useCallback(
     (product: POSProduct) => {
+      if (paymentOpen) return;
       if (product.quantity <= 0) {
         toast.error("Product is out of stock.");
         return;
@@ -63,13 +62,13 @@ export function POSLayout({
 
       toast.success(`${product.name} added to cart`);
     },
-    [addItem]
+    [addItem, paymentOpen],
   );
 
   const handleBarcodeScan = useCallback(
     (barcode: string) => {
       const product = products.find(
-        (p) => p.barcode === barcode || p.sku === barcode
+        (p) => p.barcode === barcode || p.sku === barcode,
       );
 
       if (product) {
@@ -78,7 +77,7 @@ export function POSLayout({
         toast.error(`Product not found: ${barcode}`);
       }
     },
-    [products, handleAddToCart]
+    [products, handleAddToCart],
   );
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
@@ -87,7 +86,7 @@ export function POSLayout({
     {
       key: "F3",
       callback: () => {
-        if (items.length > 0) {
+        if (!paymentOpen && items.length > 0) {
           holdOrder();
           toast.success("Order held!");
         }
@@ -102,10 +101,10 @@ export function POSLayout({
   ]);
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-dvh flex-col bg-background">
       <POSHeader
         onHoldOrder={() => {
-          if (items.length > 0) {
+          if (!paymentOpen && items.length > 0) {
             holdOrder();
             toast.success("Order held!");
           }
@@ -113,9 +112,11 @@ export function POSLayout({
         onShowHeld={() => setHeldOpen(true)}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left — Products */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div
+          className={`${mobileCartOpen ? "hidden" : "flex"} md:flex min-w-0 flex-1 flex-col overflow-hidden`}
+        >
           <div className="px-4 py-3 border-b">
             <ProductSearch value={search} onChange={setSearch} />
           </div>
@@ -129,12 +130,24 @@ export function POSLayout({
         </div>
 
         {/* Right — Cart */}
-        <div className="w-95 xl:w-105 shrink-0 hidden md:flex">
+        <div
+          className={`${mobileCartOpen ? "flex" : "hidden"} md:flex w-full md:w-95 xl:w-105 shrink-0`}
+        >
           <CartPanel
             customers={customers}
             onCheckout={() => setPaymentOpen(true)}
           />
         </div>
+      </div>
+      <div className="border-t p-3 md:hidden">
+        <Button
+          className="w-full"
+          onClick={() => setMobileCartOpen(!mobileCartOpen)}
+        >
+          {mobileCartOpen
+            ? "Back to products"
+            : `View cart (${items.reduce((sum, item) => sum + item.quantity, 0)} items)`}
+        </Button>
       </div>
 
       {/* Modals */}

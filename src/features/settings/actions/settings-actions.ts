@@ -1,9 +1,35 @@
 "use server";
 
+import { requireStaff } from "@/lib/authorization";
+
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 
+export async function getReceiptSettings() {
+  await requireStaff();
+  const settings = await prisma.settings.findMany({
+    where: {
+      key: {
+        in: [
+          "store_name",
+          "store_phone",
+          "store_email",
+          "store_address",
+          "receipt_header",
+          "receipt_footer",
+          "receipt_note",
+        ],
+      },
+    },
+    select: { key: true, value: true },
+  });
+  return Object.fromEntries(
+    settings.map((setting) => [setting.key, setting.value]),
+  );
+}
+
 export async function getAllSettings() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const settings = await prisma.settings.findMany({
     orderBy: { key: "asc" },
   });
@@ -17,6 +43,7 @@ export async function getAllSettings() {
 }
 
 export async function updateSettingAction(key: string, value: string) {
+  await requireStaff(["OWNER", "ADMIN"]);
   try {
     await prisma.settings.upsert({
       where: { key },
@@ -32,16 +59,32 @@ export async function updateSettingAction(key: string, value: string) {
 }
 
 export async function updateMultipleSettingsAction(
-  updates: { key: string; value: string }[]
+  updates: { key: string; value: string }[],
 ) {
+  await requireStaff(["OWNER", "ADMIN"]);
   try {
-    for (const item of updates) {
-      await prisma.settings.upsert({
-        where: { key: item.key },
-        update: { value: item.value },
-        create: { key: item.key, value: item.value },
-      });
+    if (
+      !Array.isArray(updates) ||
+      updates.length > 50 ||
+      updates.some(
+        (item) =>
+          typeof item.key !== "string" ||
+          item.key.length > 100 ||
+          typeof item.value !== "string" ||
+          item.value.length > 5000,
+      )
+    ) {
+      return { success: false, error: "Invalid settings." };
     }
+    await prisma.$transaction(
+      updates.map((item) =>
+        prisma.settings.upsert({
+          where: { key: item.key },
+          update: { value: item.value },
+          create: { key: item.key, value: item.value },
+        }),
+      ),
+    );
 
     revalidatePath("/settings");
     return { success: true, message: "Settings saved successfully." };
@@ -51,6 +94,7 @@ export async function updateMultipleSettingsAction(
 }
 
 export async function getSystemInfo() {
+  await requireStaff(["OWNER", "ADMIN", "MANAGER"]);
   const [
     userCount,
     productCount,
@@ -91,6 +135,7 @@ export async function getSystemInfo() {
 }
 
 export async function exportDatabaseAction() {
+  await requireStaff(["OWNER", "ADMIN"]);
   try {
     const [
       users,
@@ -103,7 +148,16 @@ export async function exportDatabaseAction() {
       expenses,
       settings,
     ] = await Promise.all([
-      prisma.user.findMany({ select: { id: true, name: true, email: true, role: true, phone: true, isActive: true } }),
+      prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          isActive: true,
+        },
+      }),
       prisma.product.findMany(),
       prisma.category.findMany(),
       prisma.brand.findMany(),

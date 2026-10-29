@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { usePendingRequest } from "@/hooks/use-pending-request";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote,
   CreditCard,
   Building,
   QrCode,
-  Gift,
   CheckCircle,
   Loader2,
   Printer,
@@ -42,7 +43,6 @@ const paymentMethods = [
     color: "bg-purple-500",
   },
   { id: "QR", label: "QR", icon: QrCode, color: "bg-cyan-500" },
-  { id: "GIFT_CARD", label: "Gift", icon: Gift, color: "bg-pink-500" },
 ];
 
 export function PaymentModal({
@@ -53,13 +53,27 @@ export function PaymentModal({
   const [method, setMethod] = useState("CASH");
   const [paidAmount, setPaidAmount] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
- const [orderResult, setOrderResult] = useState<{
-  orderNumber: string;
-  orderId: string;
-  total: number;
-  change: number;
-} | null>(null);
+  const [orderResult, setOrderResult] = useState<{
+    orderNumber: string;
+    orderId: string;
+    total: number;
+    change: number;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const busy = useRef(false);
+  const router = useRouter();
+  const recovery = usePendingRequest<
+    Parameters<typeof createOrderAction>[0] & { displayedTotal: number }
+  >(`pos-pending-sale:${cashierId}`);
+  const saved = recovery.pending;
+  const locked = isPending || !!saved;
+  useEffect(() => {
+    if (saved) {
+      setMethod(saved.paymentMethod);
+      setPaidAmount(String(saved.paidAmount));
+      onOpenChange(true);
+    }
+  }, [saved, onOpenChange]);
 
   const items = useCartStore((s) => s.items);
   const customerId = useCartStore((s) => s.customerId);
@@ -69,7 +83,7 @@ export function PaymentModal({
   const getGrandTotal = useCartStore((s) => s.getGrandTotal);
   const clearCart = useCartStore((s) => s.clearCart);
 
-  const total = getGrandTotal();
+  const total = saved?.displayedTotal ?? getGrandTotal();
   const paid = parseFloat(paidAmount) || 0;
   const change = Math.max(0, paid - total);
 
@@ -82,43 +96,72 @@ export function PaymentModal({
   ].filter((a, i, arr) => a >= total && arr.indexOf(a) === i);
 
   const handlePay = () => {
-    if (method === "CASH" && paid < total) {
+    if (busy.current || !recovery.ready || (!saved && items.length === 0))
+      return;
+    if (!saved && method === "CASH" && paid < total) {
       toast.error("Insufficient amount.");
       return;
     }
 
+    const request = saved ?? {
+      requestKey: crypto.randomUUID(),
+      items,
+      customerId,
+      cashierId,
+      paymentMethod: method,
+      paidAmount: method === "CASH" ? paid : total,
+      couponCode,
+      couponDiscount,
+      note,
+      displayedTotal: total,
+    };
+    if (!saved && !recovery.save(request)) return;
+    busy.current = true;
     startTransition(async () => {
-      const finalPaid = method === "CASH" ? paid : total;
+      try {
+        const result = await createOrderAction(request);
 
-      const result = await createOrderAction({
-        items,
-        customerId,
-        cashierId,
-        paymentMethod: method,
-        paidAmount: finalPaid,
-        couponCode,
-        couponDiscount,
-        note,
-      });
+        if (!result.success) {
+          toast.error(result.error || "Payment failed.");
+          if (!result.retryable) {
+            // Restore the saved cart after a reload if the server definitively rejected it.
+            useCartStore.setState({
+              items: request.items,
+              customerId: request.customerId,
+              couponCode: request.couponCode,
+              couponDiscount: request.couponDiscount,
+              note: request.note,
+            });
+            recovery.clear();
+            router.refresh();
+          }
+          return;
+        }
 
-      if (!result.success) {
-        toast.error(result.error || "Payment failed.");
-        return;
+        if (!recovery.clear()) return;
+
+        setIsSuccess(true);
+        setOrderResult({
+          orderNumber: result.orderNumber ?? "",
+          orderId: result.orderId ?? "",
+          total: result.total ?? total,
+          change: result.changeAmount ?? 0,
+        });
+
+        clearCart();
+        router.refresh();
+      } catch {
+        toast.error(
+          "The sale result is unknown. Retry the saved sale to recover its invoice; do not take payment again.",
+        );
+      } finally {
+        busy.current = false;
       }
-
-      setIsSuccess(true);
-    setOrderResult({
-  orderNumber: result.orderNumber ?? "",
-  orderId: result.orderId ?? "",
-  total: result.total ?? total,
-  change: result.changeAmount ?? 0,
-});
-
-      clearCart();
     });
   };
 
   const handleClose = () => {
+    if (locked) return;
     setIsSuccess(false);
     setOrderResult(null);
     setPaidAmount("");
@@ -127,8 +170,11 @@ export function PaymentModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+    <Dialog open={open || !!saved} onOpenChange={handleClose}>
+      <DialogContent
+        showCloseButton={!locked}
+        className="sm:max-w-lg p-0 max-h-[90dvh] overflow-y-auto"
+      >
         <AnimatePresence mode="wait">
           {isSuccess && orderResult ? (
             <motion.div
@@ -167,33 +213,37 @@ export function PaymentModal({
                   </div>
                 )}
               </div>
-<div className="flex gap-3">
-  <Button
-    variant="outline"
-    className="flex-1"
-    onClick={handleClose}
-  >
-    New Sale
-  </Button>
-  <Button
-    className="flex-1"
-    onClick={() => {
-      if (orderResult?.orderId) {
-        window.open(
-          `/sales/${orderResult.orderId}?print=1`,
-          "_blank"
-        );
-      }
-      handleClose();
-    }}
-  >
-    <Printer className="mr-2 h-4 w-4" />
-    Print & Done
-  </Button>
-</div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleClose}
+                >
+                  New Sale
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    if (orderResult?.orderId) {
+                      window.open(
+                        `/sales/${orderResult.orderId}?print=1`,
+                        "_blank",
+                      );
+                    }
+                    handleClose();
+                  }}
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print & Done
+                </Button>
+              </div>
             </motion.div>
           ) : (
-            <motion.div key="payment" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div
+              key="payment"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
               <DialogHeader className="p-6 pb-4">
                 <DialogTitle className="text-xl font-black">
                   Payment
@@ -201,6 +251,25 @@ export function PaymentModal({
               </DialogHeader>
 
               <div className="px-6 space-y-5 pb-6">
+                {recovery.error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {recovery.error}
+                  </p>
+                )}
+                {saved && (
+                  <div
+                    role="status"
+                    className="rounded-xl border border-amber-500 p-3 text-sm"
+                  >
+                    A sale is awaiting confirmation. Retry this saved sale to
+                    recover the original invoice. Do not collect payment again.
+                    <p className="mt-1">
+                      {saved.items
+                        .map((item) => `${item.name} × ${item.quantity}`)
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
                 {/* Total */}
                 <div className="rounded-2xl bg-primary/5 border border-primary/20 p-5 text-center">
                   <p className="text-sm text-muted-foreground mb-1">
@@ -216,7 +285,11 @@ export function PaymentModal({
                   <Label className="text-xs font-bold mb-2 block">
                     Payment Method
                   </Label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Confirm that payment was received before recording the sale.
+                    Card, bank and QR payments are recorded manually.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
                     {paymentMethods.map((pm) => (
                       <motion.button
                         key={pm.id}
@@ -224,6 +297,7 @@ export function PaymentModal({
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setMethod(pm.id)}
                         type="button"
+                        disabled={locked}
                         className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-all ${
                           method === pm.id
                             ? "border-primary bg-primary/5 shadow-md"
@@ -252,6 +326,7 @@ export function PaymentModal({
                       </Label>
                       <Input
                         type="number"
+                        disabled={locked}
                         value={paidAmount}
                         onChange={(e) => setPaidAmount(e.target.value)}
                         placeholder="0.00"
@@ -264,6 +339,7 @@ export function PaymentModal({
                       {quickAmounts.map((amt) => (
                         <Button
                           key={amt}
+                          disabled={locked}
                           type="button"
                           variant="outline"
                           size="sm"
@@ -290,7 +366,11 @@ export function PaymentModal({
                 <Button
                   onClick={handlePay}
                   disabled={
-                    isPending || (method === "CASH" && paid < total)
+                    isPending ||
+                    !recovery.ready ||
+                    (!saved &&
+                      (items.length === 0 ||
+                        (method === "CASH" && paid < total)))
                   }
                   className="w-full h-12 text-base font-bold rounded-xl shadow-lg"
                 >
@@ -299,6 +379,8 @@ export function PaymentModal({
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Processing...
                     </>
+                  ) : saved ? (
+                    "Retry saved sale"
                   ) : (
                     `Confirm Payment — ${formatCurrency(total)}`
                   )}

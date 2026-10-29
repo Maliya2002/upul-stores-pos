@@ -15,7 +15,7 @@ const optionalNumber = z
 
     const parsed = typeof value === "number" ? value : Number(value);
 
-    if (Number.isNaN(parsed) || parsed < 0) {
+    if (!Number.isFinite(parsed) || parsed < 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Value must be a valid non-negative number",
@@ -49,12 +49,14 @@ export const productSchema = z.object({
   categoryId: z.string().min(1, "Category is required"),
   brandId: optionalText,
   supplierId: optionalText,
-  purchasePrice: z.coerce
-    .number()
-    .min(0, "Purchase price must be 0 or more"),
+  purchasePrice: z.coerce.number().min(0, "Purchase price must be 0 or more"),
   sellingPrice: z.coerce.number().min(0, "Selling price must be 0 or more"),
   tax: z.coerce.number().min(0, "Tax must be 0 or more").default(0),
-  discount: z.coerce.number().min(0, "Discount must be 0 or more").default(0),
+  discount: z.coerce
+    .number()
+    .min(0, "Discount must be 0 or more")
+    .max(100, "Discount cannot exceed 100%")
+    .default(0),
   quantity: z.coerce
     .number()
     .int("Quantity must be a whole number")

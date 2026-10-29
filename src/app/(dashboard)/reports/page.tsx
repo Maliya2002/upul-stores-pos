@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader, CurrencyDisplay, PrintButton } from "@/components/ui-custom";
+import { PageHeader, PrintButton } from "@/components/ui-custom";
 import { ExportButton } from "@/components/ui-custom";
 import {
   ReportCards,
@@ -9,8 +9,7 @@ import {
   TopProductsChart,
 } from "@/features/reports/components";
 import { getDashboardReport } from "@/features/reports/actions/report-actions";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui-custom";
 
 export default async function ReportsPage() {
@@ -32,6 +31,27 @@ export default async function ReportsPage() {
         }
       />
 
+      <div className="rounded-lg border p-4 text-sm space-y-2">
+        <p>
+          Periods use Asia/Colombo. Net receipts include tax and invoice
+          discounts; refunds reduce the period when the return was recorded.
+          Expenses use their paid date.
+        </p>
+        <p>
+          Estimated profit excludes tax allocated using each line�s saved tax
+          rate, historical item costs and recorded expenses. Only restocked
+          returns reverse item cost. This estimate depends on complete expense
+          and cost records.
+        </p>
+        {report.month.incomplete > 0 && (
+          <p role="status" className="font-medium text-amber-600">
+            Monthly profit unavailable: {report.month.incomplete} sale or return
+            records have missing historical details. Current product costs are
+            never substituted.
+          </p>
+        )}
+      </div>
+
       {/* Stats Cards */}
       <ReportCards
         todayRevenue={report.today.revenue}
@@ -48,7 +68,9 @@ export default async function ReportsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="card-hover">
           <CardContent className="p-5">
-            <p className="text-xs text-muted-foreground">Weekly Revenue</p>
+            <p className="text-xs text-muted-foreground">
+              Net Receipts � Last 7 Days
+            </p>
             <p className="text-xl font-black mt-1">
               {formatCurrency(report.week.revenue)}
             </p>
@@ -60,7 +82,9 @@ export default async function ReportsPage() {
 
         <Card className="card-hover">
           <CardContent className="p-5">
-            <p className="text-xs text-muted-foreground">Yearly Revenue</p>
+            <p className="text-xs text-muted-foreground">
+              Year-to-date Net Receipts
+            </p>
             <p className="text-xl font-black mt-1">
               {formatCurrency(report.year.revenue)}
             </p>
@@ -82,9 +106,7 @@ export default async function ReportsPage() {
         <Card className="card-hover">
           <CardContent className="p-5">
             <p className="text-xs text-muted-foreground">Suppliers</p>
-            <p className="text-xl font-black mt-1">
-              {report.totals.suppliers}
-            </p>
+            <p className="text-xl font-black mt-1">{report.totals.suppliers}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {report.totals.outOfStock} out of stock
             </p>
@@ -123,12 +145,12 @@ export default async function ReportsPage() {
                     className="flex items-center justify-between rounded-xl border p-4 hover:bg-muted/30 transition-colors"
                   >
                     <div>
-                      <p className="text-sm font-bold">
-                        #{order.orderNumber}
-                      </p>
+                      <p className="text-sm font-bold">#{order.orderNumber}</p>
                       <p className="text-xs text-muted-foreground">
                         {order.customer} ·{" "}
-                        {formatDateTime(new Date(order.date))}
+                        {new Date(order.date).toLocaleString("en-LK", {
+                          timeZone: "Asia/Colombo",
+                        })}
                       </p>
                     </div>
                     <div className="text-right flex items-center gap-3">
@@ -138,7 +160,7 @@ export default async function ReportsPage() {
                       </span>
                     </div>
                   </div>
-                )
+                ),
               )}
             </div>
           )}
