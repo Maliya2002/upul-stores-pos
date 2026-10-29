@@ -329,6 +329,36 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
       await assert.rejects(stockOutAction(data));
       await prisma.user.update({ where: { id: user.id }, data: { role: "MANAGER" } });
     });
+    await t.test("supplier credit and payments stay consistent under retries and competing payments", async () => {
+      const { addSupplierPaymentAction } = await import("../src/features/suppliers/actions/supplier-actions.ts");
+      const creditInput = { requestKey: randomUUID(), supplierId: supplier.id, paymentMethod: "CASH", paidAmount: 0, notes: prefix, items: [{ productId: product.id, name: product.name, quantity: 1, unitCost: 10 }] };
+      assert.equal((await createPurchaseAction({ ...creditInput, paidAmount: 11 })).success, false);
+      const credit = await createPurchaseAction(creditInput);
+      assert.equal(credit.success, true);
+      assert.equal((await prisma.purchase.findUniqueOrThrow({ where: { id: credit.purchaseId } })).paymentStatus, "PENDING");
+      assert.equal((await addSupplierPaymentAction({ requestKey: randomUUID(), purchaseId: credit.purchaseId, supplierId: supplier.id, amount: 10, method: "CASH", reference: prefix, notes: "settle credit" })).success, true);
+      const result = await createPurchaseAction({ requestKey: randomUUID(), supplierId: supplier.id, paymentMethod: "CASH", paidAmount: 20, notes: prefix,
+        items: [{ productId: product.id, name: product.name, quantity: 1, unitCost: 100 }] });
+      assert.equal(result.success, true, result.error);
+      const purchase = await prisma.purchase.findUniqueOrThrow({ where: { id: result.purchaseId } });
+      assert.equal(purchase.paidAmount, 20); assert.equal(purchase.paymentStatus, "PARTIAL");
+      assert.equal((await prisma.supplier.findUniqueOrThrow({ where: { id: supplier.id } })).balance, 80);
+      const payload = { requestKey: randomUUID(), purchaseId: purchase.id, supplierId: supplier.id, amount: 30, method: "BANK_TRANSFER", reference: prefix, notes: "test" };
+      const repeat = await Promise.all([addSupplierPaymentAction(payload), addSupplierPaymentAction(payload)]);
+      assert.ok(repeat.every(r => r.success && r.paymentId === repeat[0].paymentId));
+      assert.equal((await addSupplierPaymentAction({ ...payload, amount: 31 })).success, false);
+      const competing = await Promise.all([addSupplierPaymentAction({ ...payload, requestKey: randomUUID(), amount: 50 }), addSupplierPaymentAction({ ...payload, requestKey: randomUUID(), amount: 50 })]);
+      assert.equal(competing.filter(r => r.success).length, 1);
+      const paid = await prisma.purchase.findUniqueOrThrow({ where: { id: purchase.id } });
+      assert.equal(paid.paidAmount, 100); assert.equal(paid.paymentStatus, "PAID");
+      assert.equal((await prisma.supplier.findUniqueOrThrow({ where: { id: supplier.id } })).balance, 0);
+      assert.equal(await prisma.supplierPayment.count({ where: { purchaseId: purchase.id } }), 3);
+      assert.equal(await prisma.auditLog.count({ where: { userId: user.id, action: "SUPPLIER_PAYMENT" } }), 3);
+      assert.equal((await addSupplierPaymentAction({ ...payload, requestKey: randomUUID(), amount: 0.001 })).success, false);
+      await prisma.user.update({ where: { id: user.id }, data: { role: "CASHIER" } });
+      await assert.rejects(addSupplierPaymentAction(payload));
+      await prisma.user.update({ where: { id: user.id }, data: { role: "MANAGER" } });
+    });
     await t.test(
       "invalid adjustments fail and cashiers cannot purchase or refund",
       async () => {
@@ -385,6 +415,7 @@ test("real PostgreSQL: checkout, rollback, concurrent stock/coupons, refunds and
     ).map((order) => order.id);
     await prisma.refund.deleteMany({ where: { orderId: { in: ids } } });
     await prisma.order.deleteMany({ where: { id: { in: ids } } });
+    await prisma.supplierPayment.deleteMany({ where: { supplierId: supplier.id } });
     await prisma.purchase.deleteMany({ where: { supplierId: supplier.id } });
     await prisma.stockMovement.deleteMany({ where: { productId: product.id } });
     await prisma.product.delete({ where: { id: product.id } });

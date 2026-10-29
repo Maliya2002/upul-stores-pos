@@ -29,9 +29,9 @@ Verified with pure arithmetic/date tests and PostgreSQL integration fixtures for
 
 ## Purchase receiving delivery
 
-The existing fully received/fully paid purchase action now requires a UUID request reference. A unique database key and staff/payload fingerprint prevent repeated stock increments on retry; serializable retries re-read the receipt. Purchase, stock history, supplier order count and staff audit entry commit together. The form retains an unresolved request in session storage and restores it after reload. Clear browser storage/new tabs do not preserve that recovery context: inspect purchase history before re-entering an uncertain receipt.
+The received purchase action requires a UUID request reference. A unique database key and staff/payload fingerprint prevent repeated stock increments on retry; serializable retries re-read the receipt. Purchase, stock history, supplier order count and staff audit entry commit together. The form retains an unresolved request in session storage and restores it after reload. Clear browser storage/new tabs do not preserve that recovery context: inspect purchase history before re-entering an uncertain receipt.
 
-This form records cash-paid goods already received. Pending orders, partial receiving, supplier credit/payments and stock valuation remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
+This form records goods already received, with cash payment now or supplier credit. Pending orders, partial receiving and stock valuation remain future work. Purchase receiving does not yet change product valuation; managers must maintain product cost under the current valuation policy.
 
 Validation: 9 database integration checks, empty-database migration, targeted lint, TypeScript and Webpack production build passed. Default Turbopack build ran out of disk space; generated caches were removed. Browser acceptance remains pending. Free C: space remained approximately 220 MB after the build; more space is needed for reliable development.
 
@@ -46,3 +46,11 @@ Stock validation: 10 database integration checks passed, including competing sto
 Stock retry verification: 11 database/migration test entries passed, including concurrent identical requests, changed-payload/direction rejection and replaying an unchanged count after later stock activity. Browser refresh/recovery visual acceptance remains pending.
 
 Retry build verification: Webpack production build passed. Targeted lint passed with the same 3 warnings.
+
+## Supplier credit and payments
+
+Received purchases can record a cash amount paid now (blank preserves full-payment behavior, zero creates credit). The remaining amount increments supplier debt. Initial payments are recorded with the purchase. Subsequent cash/card/bank/QR payments are linked to the received purchase, use unique retry references and update purchase paid amount/status, supplier balance, payment history and actor audit atomically. Overpayment and payments against inconsistent supplier balances are rejected. Existing unallocated payments are retained without guessed allocations. Supplier deletion refuses payment history or nonzero balances.
+
+The payment form records money already paid; it does not transfer funds or deduct a cash shift. Purchase payment records remain separate from operating expenses. Browser storage retains pending requests only in the same tab; cleared storage requires checking history before re-entry. Pending purchase orders, partial receiving, payment reversals and supplier statement reconciliation remain future work.
+
+Supplier-credit validation: database suite (11 checks) and empty-database migration passed, as did targeted lint and Webpack production build including TypeScript. Tests cover zero/full/partial payments, concurrent settlement, replay conflicts, decimal validation and cashier restrictions. Browser visual/recovery acceptance remains pending.

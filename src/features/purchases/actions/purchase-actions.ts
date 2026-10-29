@@ -43,6 +43,7 @@ export async function getPurchaseById(id: string) {
     where: { id },
     include: {
       supplier: true,
+      payments: { orderBy: [{ paidAt: "desc" }, { id: "desc" }] },
       items: {
         include: { product: { select: { name: true, sku: true } } },
       },
@@ -84,6 +85,7 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
   try {
     validateRequestKey(data.requestKey);
     const requestHash = fingerprint({
+      ...(data.paidAmount !== undefined ? { paidAmount: data.paidAmount } : {}),
       staff: staff.id,
       supplier: data.supplierId,
       payment: data.paymentMethod,
@@ -103,8 +105,18 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
       ),
     );
 
-    if (!Number.isSafeInteger(Math.round(subtotal * 100)) || subtotal > 100000000) throw new CheckoutError("Purchase total must not exceed Rs. 100,000,000.");
+    if (
+      !Number.isSafeInteger(Math.round(subtotal * 100)) ||
+      subtotal > 100000000
+    )
+      throw new CheckoutError(
+        "Purchase total must not exceed Rs. 100,000,000.",
+      );
 
+    const paid = data.paidAmount ?? subtotal;
+    if (paid > subtotal)
+      throw new CheckoutError("Payment exceeds the purchase total.");
+    const due = money(subtotal - paid);
     const purchase = await serializable(async (tx) => {
       const replay = await tx.purchase.findUnique({
         where: { requestKey: data.requestKey },
@@ -135,10 +147,11 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
           supplierId: data.supplierId,
           subtotal,
           total: subtotal,
-          paidAmount: subtotal,
+          paidAmount: paid,
           status: "RECEIVED",
           paymentMethod: data.paymentMethod,
-          paymentStatus: "PAID",
+          paymentStatus:
+            due === 0 ? "PAID" : paid === 0 ? "PENDING" : "PARTIAL",
           notes: data.notes?.trim() || null,
           items: {
             create: data.items.map((item) => ({
@@ -184,9 +197,19 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
       // Update supplier
       await tx.supplier.update({
         where: { id: data.supplierId },
-        data: { totalOrders: { increment: 1 } },
+        data: { totalOrders: { increment: 1 }, balance: { increment: due } },
       });
 
+      if (paid > 0)
+        await tx.supplierPayment.create({
+          data: {
+            supplierId: data.supplierId,
+            purchaseId: newPurchase.id,
+            amount: paid,
+            method: data.paymentMethod,
+            notes: "Payment at receiving",
+          },
+        });
       await tx.auditLog.create({
         data: {
           userId: staff.id,
@@ -196,6 +219,8 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
           newValues: JSON.stringify({
             purchaseNumber: newPurchase.purchaseNumber,
             total: subtotal,
+            paidAmount: paid,
+            outstanding: due,
             supplierId: data.supplierId,
           }),
         },
@@ -203,6 +228,8 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
       return newPurchase;
     });
 
+    revalidatePath("/suppliers");
+    revalidatePath(`/suppliers/${data.supplierId}`);
     revalidatePath("/purchases");
     revalidatePath("/inventory");
     revalidatePath("/products");
@@ -215,7 +242,8 @@ export async function createPurchaseAction(input: PurchaseFormValues) {
   } catch (error) {
     return {
       success: false,
-      retryable: error instanceof RequestConflict || !(error instanceof CheckoutError),
+      retryable:
+        error instanceof RequestConflict || !(error instanceof CheckoutError),
       error:
         error instanceof CheckoutError
           ? error.message

@@ -20,6 +20,15 @@ export const purchaseItemSchema = z.object({
 
 export const purchaseSchema = z.object({
   requestKey: z.string().uuid("A transaction reference is required"),
+  paidAmount: z
+    .number()
+    .min(0)
+    .max(100000000)
+    .refine(
+      (v) => Math.abs(v * 100 - Math.round(v * 100)) < 0.00001,
+      "Use at most two decimal places",
+    )
+    .optional(),
   supplierId: z.string().min(1, "Supplier is required"),
   paymentMethod: z
     .enum(["CASH", "CARD", "BANK_TRANSFER", "QR", "GIFT_CARD", "MIXED"])

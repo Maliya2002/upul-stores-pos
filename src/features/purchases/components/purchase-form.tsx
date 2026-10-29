@@ -38,6 +38,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
   const storageKey = "pending-purchase-v1";
   const [isPending, startTransition] = useTransition();
   const [supplierId, setSupplierId] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
@@ -47,6 +48,9 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
       if (saved) {
         const pending = JSON.parse(saved);
         setSupplierId(pending.supplierId);
+        setPaidAmount(
+          pending.paidAmount === undefined ? "" : String(pending.paidAmount),
+        );
         setNotes(pending.notes);
         setItems(pending.items);
         toast.info("Pending purchase restored. Retry to confirm its outcome.");
@@ -129,6 +133,7 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
     startTransition(async () => {
       try {
         const payload = {
+          ...(paidAmount !== "" ? { paidAmount: Number(paidAmount) } : {}),
           supplierId,
           paymentMethod: "CASH" as const,
           notes,
@@ -141,6 +146,9 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
         if (
           saved &&
           JSON.stringify({
+            ...(pending.paidAmount !== undefined
+              ? { paidAmount: pending.paidAmount }
+              : {}),
             supplierId: pending.supplierId,
             paymentMethod: pending.paymentMethod,
             notes: pending.notes,
@@ -176,10 +184,20 @@ export function PurchaseForm({ suppliers, products }: PurchaseFormProps) {
   return (
     <div className="space-y-6">
       <p className="rounded-lg border p-4 text-sm">
-        Record goods already received and fully paid in cash. Stock increases
-        immediately. This is not a pending purchase order or supplier-credit
-        entry.
+        Record goods already received. Enter cash paid now, or zero for supplier
+        credit. Stock increases immediately; the unpaid amount becomes supplier
+        debt.
       </p>
+      <label className="flex flex-col gap-2">
+        Cash paid now (leave blank for full payment)
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={paidAmount}
+          onChange={(e) => setPaidAmount(e.target.value)}
+        />
+      </label>
       <FormSection title="Purchase Details">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">

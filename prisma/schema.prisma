@@ -315,6 +315,10 @@ model Supplier {
 }
 
 model SupplierPayment {
+  requestKey String? @unique
+  requestHash String?
+  purchaseId String?
+  purchase Purchase? @relation(fields: [purchaseId], references: [id])
   id          String        @id @default(cuid())
   supplierId  String
   amount      Float
@@ -504,6 +508,7 @@ model Warehouse {
 // ─── Purchases ────────────────────────────────────────────────
 
 model Purchase {
+  payments SupplierPayment[]
   requestKey String? @unique
   requestHash String?
   id             String         @id @default(cuid())

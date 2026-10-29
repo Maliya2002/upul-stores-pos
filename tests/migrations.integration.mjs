@@ -34,7 +34,7 @@ test("migration history installs on an empty disposable database", async () => {
     const migrations = await fresh.$queryRawUnsafe(
       'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL',
     );
-    assert.equal(migrations.length, 5);
+    assert.equal(migrations.length, 6);
     assert.equal(await fresh.cashShift.count(), 0);
   } finally {
     await fresh.$disconnect();
