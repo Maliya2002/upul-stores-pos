@@ -54,3 +54,6 @@ Received purchases can record a cash amount paid now (blank preserves full-payme
 The payment form records money already paid; it does not transfer funds or deduct a cash shift. Purchase payment records remain separate from operating expenses. Browser storage retains pending requests only in the same tab; cleared storage requires checking history before re-entry. Pending purchase orders, partial receiving, payment reversals and supplier statement reconciliation remain future work.
 
 Supplier-credit validation: database suite (11 checks) and empty-database migration passed, as did targeted lint and Webpack production build including TypeScript. Tests cover zero/full/partial payments, concurrent settlement, replay conflicts, decimal validation and cashier restrictions. Browser visual/recovery acceptance remains pending.
+
+## Backup verification delivery
+Added local backup and isolated restore verification commands. A real archive restored successfully with 33 public tables and 107 rows matching snapshot fingerprints. Corrupt-file and wrong-target tests passed. Keep verified copies off-device and perform application acceptance before recovery cutover; see BACKUP-RECOVERY.md. No automatic schedule or remote destination is configured.
